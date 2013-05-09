@@ -9,6 +9,8 @@ Homepage: https://bitbucket.org/jurko/suds
 Package: python-suds-jurko
 Architecture: all
 Depends: ${python:Depends}, ${misc:Depends}
+Conflicts: python-suds
+Replaces: python-suds
 Description: Lightweight SOAP client (Jurko's fork)
  Based on the original 'suds' project by Jeff Ortel (jortel at redhat
  dot com) hosted at 'https://fedorahosted.org/suds'.

@@ -18,33 +18,45 @@
 Provides classes for the (WS) SOAP I{document/literal}.
 """
 
-from logging import getLogger
 from suds import *
 from suds.bindings.binding import Binding
 from suds.sax.element import Element
+
+from logging import getLogger
 
 log = getLogger(__name__)
 
 
 class Document(Binding):
     """
-    The document/literal style.  Literal is the only (@use) supported
-    since document/encoded is pretty much dead.
-    Although the soap specification supports multiple documents within the soap
-    <body/>, it is very uncommon.  As such, suds presents an I{RPC} view of
-    service methods defined with a single document parameter.  This is done so
-    that the user can pass individual parameters instead of one, single document.
-    To support the complete specification, service methods defined with multiple documents
-    (multiple message parts), must present a I{document} view for that method.
-    """
+    The document/literal style. Literal is the only (@use) supported since
+    document/encoded is pretty much dead.
 
+    Although the SOAP specification supports multiple documents within the SOAP
+    <body/>, it is very uncommon. As such, suds library supports presenting an
+    I{RPC} view of service methods defined with only a single document
+    parameter. To support the complete specification, service methods defined
+    with multiple documents (multiple message parts), are still presented using
+    a full I{document} view.
+
+    More detailed description:
+    
+    An interface is considered I{wrapped} if:
+      - There is exactly one message part in that interface.
+      - The message part resolves to an element of a non-builtin type.
+    Otherwise it is considered I{bare}.
+    
+    I{Bare} interface is Interpreted directly as specified in the WSDL schema,
+    with each message part represented by a single parameter in the suds
+    library web service operation proxy interface (input or output).
+    
+    I{Wrapped} interface is interpreted without the external wrapping document
+    structure, with each of its contained elements passed through suds
+    library's web service operation proxy interface (input or output)
+    individually instead of as a single I{document} object.
+
+    """
     def bodycontent(self, method, args, kwargs):
-        #
-        # The I{wrapped} vs I{bare} style is detected in 2 ways.
-        # If there is 2+ parts in the message then it is I{bare}.
-        # If there is only (1) part and that part resolves to a builtin then
-        # it is I{bare}.  Otherwise, it is I{wrapped}.
-        #
         if not len(method.soap.input.body.parts):
             return ()
         wrapped = method.soap.input.body.wrapped
@@ -68,7 +80,7 @@ class Document(Binding):
             #     how they would be affected by this change.
             #   * If caller actually wishes to pass an empty choice parameter he
             #     can specify its value explicitly as an empty string.
-            if pd[2] and value is None:
+            if len(pd) > 2 and pd[2] and value is None:
                 continue
             p = self.mkparam(method, pd, value)
             if p is None:
@@ -83,13 +95,12 @@ class Document(Binding):
         wrapped = method.soap.output.body.wrapped
         if wrapped:
             return body[0].children
-        else:
-            return body.children
+        return body.children
 
     def document(self, wrapper):
         """
-        Get the document root.  For I{document/literal}, this is the
-        name of the wrapper element qualifed by the schema tns.
+        Get the document root. For I{document/literal}, this is the name of the
+        wrapper element qualifed by the schema's target namespace.
         @param wrapper: The method name.
         @type wrapper: L{xsd.sxbase.SchemaObject}
         @return: A root element.
@@ -101,27 +112,21 @@ class Document(Binding):
         return d
 
     def mkparam(self, method, pdef, object):
-        #
-        # Expand list parameters into individual parameters
-        # each with the type information.  This is because in document
-        # arrays are simply multi-occurrence elements.
-        #
+        """
+        Expand list parameters into individual parameters each with the type
+        information. This is because in document arrays are simply
+        multi-occurrence elements.
+        
+        """
         if isinstance(object, (list, tuple)):
             tags = []
             for item in object:
                 tags.append(self.mkparam(method, pdef, item))
             return tags
-        else:
-            return Binding.mkparam(self, method, pdef, object)
+        return Binding.mkparam(self, method, pdef, object)
 
     def param_defs(self, method):
-        #
-        # Get parameter definitions for document literal.
-        # The I{wrapped} vs I{bare} style is detected in 2 ways.
-        # If there is 2+ parts in the message then it is I{bare}.
-        # If there is only (1) part and that part resolves to a builtin then
-        # it is I{bare}.  Otherwise, it is I{wrapped}.
-        #
+        """Get parameter definitions for document literal."""
         pts = self.bodypart_types(method)
         wrapped = method.soap.input.body.wrapped
         if not wrapped:

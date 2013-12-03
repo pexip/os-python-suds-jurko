@@ -1,4 +1,4 @@
-ï»¿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the (LGPL) GNU Lesser General Public License as
@@ -32,30 +32,77 @@ if __name__ == "__main__":
         pytest.main(["--pyargs", __file__])
     except ImportError:
         print("'py.test' unit testing framework not available. Can not run "
-            "'{}' directly as a script.".format(__file__))
+            "'%s' directly as a script." % (__file__,))
     import sys
     sys.exit(-2)
 
 
-import os
-import re
+import suds
+import tests
 
 import pytest
 
-import suds.client
-import suds.store
+import re
 import xml.sax
 
 
+# TODO: Update the current choice parameter handling implementation to make
+# this test pass.
+@pytest.mark.xfail
+def test_choice_parameter_implementation_inconsistencies():
+    """
+    Choice parameter support implementation needs to be cleaned up.
+
+    If you declare a message part's element of a simple type X, or you define
+    it as a complex type having a single member of type X, and suds has been
+    configured to automatically unwrap such single-member complex types, the
+    web service proxy object's constructed function declarations should match.
+    They should both accept a single parameter of type X.
+
+    However the current choice support implementation causes only the 'complex'
+    case to get an additional 'choice' flag information to be included in the
+    constructed parameter definition structure.
+
+    """
+    client = lambda x, y : tests.client_from_wsdl(tests.wsdl_input(x, y))
+
+    client_simple_short = client("""\
+      <xsd:element name="Elemento" type="xsd:string" />""", "Elemento")
+
+    client_simple_long = client("""\
+      <xsd:element name="Elemento">
+        <xsd:simpleType>
+          <xsd:restriction base="xsd:string" />
+        </xsd:simpleType>
+      </xsd:element>""", "Elemento")
+
+    client_complex_wrapped = client("""\
+      <xsd:element name="Wrapper">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="Elemento" type="xsd:string" />
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>""", "Wrapper")
+
+    method_param = lambda x : x.sd[0].ports[0][1][0][1][0]
+    method_param_simple_short = method_param(client_simple_short)
+    method_param_simple_long = method_param(client_simple_long)
+    method_param_complex_wrapped = method_param(client_complex_wrapped)
+
+    assert len(method_param_simple_short) == len(method_param_simple_long)
+    assert len(method_param_simple_long) == len(method_param_complex_wrapped)
+
+
 def test_converting_client_to_string_must_not_raise_an_exception():
-    client = _client_from_wsdl(
-        "<?xml version='1.0' encoding='UTF-8'?><root />")
+    client = tests.client_from_wsdl(suds.byte_str(
+        "<?xml version='1.0' encoding='UTF-8'?><root />"))
     str(client)
 
 
 def test_converting_metadata_to_string():
-    client = _client_from_wsdl(
-"""<?xml version='1.0' encoding='UTF-8'?>
+    client = tests.client_from_wsdl(suds.byte_str("""\
+<?xml version='1.0' encoding='UTF-8'?>
 <wsdl:definitions targetNamespace="my-namespace"
 xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
 xmlns:ns="my-namespace"
@@ -86,7 +133,7 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
     </wsdl:port>
   </wsdl:service>
 </wsdl:definitions>
-""")
+"""))
     # Metadata with empty content.
     metadata = client.wsdl.__metadata__
     assert len(metadata) == 0
@@ -102,22 +149,23 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
 
 def test_empty_invalid_wsdl():
     try:
-        client = _client_from_wsdl("")
-        pytest.fail("Excepted exception xml.sax.SAXParseException not thrown.")
+        tests.client_from_wsdl(suds.byte_str(""))
     except xml.sax.SAXParseException, e:
         assert e.getMessage() == "no element found"
+    else:
+        pytest.fail("Expected exception xml.sax.SAXParseException not raised.")
 
 
 def test_empty_valid_wsdl():
-    client = _client_from_wsdl(
-        "<?xml version='1.0' encoding='UTF-8'?><root />")
+    client = tests.client_from_wsdl(suds.byte_str(
+        "<?xml version='1.0' encoding='UTF-8'?><root />"))
     assert not client.wsdl.services, "No service definitions must be read "  \
         "from an empty WSDL."
 
 
 def test_enumeration_type_string_should_contain_its_value():
-    client = _client_from_wsdl(
-"""<?xml version='1.0' encoding='UTF-8'?>
+    client = tests.client_from_wsdl(suds.byte_str("""\
+<?xml version='1.0' encoding='UTF-8'?>
 <wsdl:definitions targetNamespace="my-namespace"
 xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
 xmlns:ns="my-namespace"
@@ -148,7 +196,7 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
     </wsdl:port>
   </wsdl:service>
 </wsdl:definitions>
-""")
+"""))
     enumeration_data = client.wsdl.schema.types["AAA", "my-namespace"]
     # Legend:
     #   eX - enumeration element.
@@ -160,14 +208,18 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
     assert e1.name == "One"
     assert e2.name == "Two"
     assert e3.name == "Thirty-Two"
-    assert re.match('<Enumeration:0x[0-9a-f]+ name="One" />$', e1.str())
-    assert re.match('<Enumeration:0x[0-9a-f]+ name="Two" />$', e2.str())
-    assert re.match('<Enumeration:0x[0-9a-f]+ name="Thirty-Two" />$', e3.str())
+    #   Python 3 output does not include a trailing L after long integer
+    # output, while Python 2 does. For example: 0x12345678 is output as
+    # 0x12345678L in Python 2 and simply as 0x12345678 in Python 3.
+    assert re.match('<Enumeration:0x[0-9a-f]+L? name="One" />$', e1.str())
+    assert re.match('<Enumeration:0x[0-9a-f]+L? name="Two" />$', e2.str())
+    assert re.match('<Enumeration:0x[0-9a-f]+L? name="Thirty-Two" />$',
+        e3.str())
 
 
 def test_function_parameters_global_sequence_in_a_sequence():
-    client = _client_from_wsdl(
-"""<?xml version='1.0' encoding='UTF-8'?>
+    client = tests.client_from_wsdl(suds.byte_str("""\
+<?xml version='1.0' encoding='UTF-8'?>
 <wsdl:definitions targetNamespace="my-namespace"
 xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
 xmlns:ns="my-namespace"
@@ -218,7 +270,7 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
     </wsdl:port>
   </wsdl:service>
 </wsdl:definitions>
-""")
+"""))
 
     service = client.sd[0]
     assert len(service.types) == 1
@@ -226,27 +278,21 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
     # Method parameters as read from the service definition.
     assert len(service.params) == 3
     assert service.params[0][0].name == "x1"
-    assert service.params[0][0].type[0] == "string"
-    assert service.params[0][0].type[1] == "http://www.w3.org/2001/XMLSchema"
+    assert service.params[0][0].type == _string_type
     assert isinstance(service.params[0][1], suds.xsd.sxbuiltin.XString)
     assert service.params[1][0].name == "x2"
-    assert service.params[1][0].type[0] == "UngaBunga"
-    assert service.params[1][0].type[1] == "my-namespace"
+    assert service.params[1][0].type == ("UngaBunga", "my-namespace")
     assert isinstance(service.params[1][1], suds.xsd.sxbasic.Complex)
     assert service.params[2][0].name == "x3"
-    assert service.params[2][0].type[0] == "string"
-    assert service.params[2][0].type[1] == "http://www.w3.org/2001/XMLSchema"
+    assert service.params[2][0].type == _string_type
     assert isinstance(service.params[2][1], suds.xsd.sxbuiltin.XString)
 
     # Method parameters as read from a method object.
     assert len(service.ports) == 1
     port, methods = service.ports[0]
     assert len(methods) == 1
-    method = methods[0]
-    assert len(method) == 2
-    method_name = method[0]
+    method_name, method_params = methods[0]
     assert method_name == "f"
-    method_params = method[1]
     assert len(method_params) == 3
     assert method_params[0][0] == "x1"
     assert method_params[0][1] is service.params[0][0]
@@ -257,8 +303,8 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
 
 
 def test_function_parameters_local_choice():
-    client = _client_from_wsdl(
-"""<?xml version='1.0' encoding='UTF-8'?>
+    client = tests.client_from_wsdl(suds.byte_str("""\
+<?xml version='1.0' encoding='UTF-8'?>
 <wsdl:definitions targetNamespace="my-namespace"
 xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
 xmlns:ns="my-namespace"
@@ -301,7 +347,7 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
     </wsdl:port>
   </wsdl:service>
 </wsdl:definitions>
-""")
+"""))
 
     service = client.sd[0]
     assert not service.types
@@ -309,19 +355,16 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
     # Method parameters as read from the service definition.
     assert len(service.params) == 2
     assert service.params[0][0].name == "u1"
-    assert service.params[0][0].type[0] == "string"
-    assert service.params[0][0].type[1] == "http://www.w3.org/2001/XMLSchema"
+    assert service.params[0][0].type == _string_type
     assert isinstance(service.params[0][1], suds.xsd.sxbuiltin.XString)
     assert service.params[1][0].name == "u2"
-    assert service.params[1][0].type[0] == "string"
-    assert service.params[1][0].type[1] == "http://www.w3.org/2001/XMLSchema"
+    assert service.params[1][0].type == _string_type
     assert isinstance(service.params[1][1], suds.xsd.sxbuiltin.XString)
 
     # Method parameters as read from a method object.
     assert len(service.ports) == 1
     port, methods = service.ports[0]
     assert len(methods) == 1
-    assert len(methods[0]) == 2
     method_name, method_params = methods[0]
     assert method_name == "f"
     assert len(method_params) == 2
@@ -337,8 +380,8 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
 
 
 def test_function_parameters_local_choice_in_a_sequence():
-    client = _client_from_wsdl(
-"""<?xml version='1.0' encoding='UTF-8'?>
+    client = tests.client_from_wsdl(suds.byte_str("""\
+<?xml version='1.0' encoding='UTF-8'?>
 <wsdl:definitions targetNamespace="my-namespace"
 xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
 xmlns:ns="my-namespace"
@@ -390,7 +433,7 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
     </wsdl:port>
   </wsdl:service>
 </wsdl:definitions>
-""")
+"""))
 
     service = client.sd[0]
     assert not service.types
@@ -398,26 +441,21 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
     # Method parameters as read from the service definition.
     assert len(service.params) == 3
     assert service.params[0][0].name == "x1"
-    assert service.params[0][0].type[0] == "string"
-    assert service.params[0][0].type[1] == "http://www.w3.org/2001/XMLSchema"
+    assert service.params[0][0].type == _string_type
     assert isinstance(service.params[0][1], suds.xsd.sxbuiltin.XString)
     assert service.params[1][0].name == "x2"
     assert service.params[1][0].type is None
     assert isinstance(service.params[1][1], suds.xsd.sxbasic.Element)
     assert service.params[2][0].name == "x3"
-    assert service.params[2][0].type[0] == "string"
-    assert service.params[2][0].type[1] == "http://www.w3.org/2001/XMLSchema"
+    assert service.params[2][0].type == _string_type
     assert isinstance(service.params[2][1], suds.xsd.sxbuiltin.XString)
 
     # Method parameters as read from a method object.
     assert len(service.ports) == 1
     port, methods = service.ports[0]
     assert len(methods) == 1
-    method = methods[0]
-    assert len(method) == 2
-    method_name = method[0]
+    method_name, method_params = methods[0]
     assert method_name == "f"
-    method_params = method[1]
     assert len(method_params) == 3
     assert method_params[0][0] == "x1"
     assert method_params[0][1] is service.params[0][0]
@@ -442,8 +480,8 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
 
 
 def test_function_parameters_local_sequence_in_a_sequence():
-    client = _client_from_wsdl(
-"""<?xml version='1.0' encoding='UTF-8'?>
+    client = tests.client_from_wsdl(suds.byte_str("""\
+<?xml version='1.0' encoding='UTF-8'?>
 <wsdl:definitions targetNamespace="my-namespace"
 xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
 xmlns:ns="my-namespace"
@@ -495,7 +533,7 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
     </wsdl:port>
   </wsdl:service>
 </wsdl:definitions>
-""")
+"""))
 
     service = client.sd[0]
     assert not service.types
@@ -503,26 +541,21 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
     # Method parameters as read from the service definition.
     assert len(service.params) == 3
     assert service.params[0][0].name == "x1"
-    assert service.params[0][0].type[0] == "string"
-    assert service.params[0][0].type[1] == "http://www.w3.org/2001/XMLSchema"
+    assert service.params[0][0].type == _string_type
     assert isinstance(service.params[0][1], suds.xsd.sxbuiltin.XString)
     assert service.params[1][0].name == "x2"
     assert service.params[1][0].type is None
     assert isinstance(service.params[1][1], suds.xsd.sxbasic.Element)
     assert service.params[2][0].name == "x3"
-    assert service.params[2][0].type[0] == "string"
-    assert service.params[2][0].type[1] == "http://www.w3.org/2001/XMLSchema"
+    assert service.params[2][0].type == _string_type
     assert isinstance(service.params[2][1], suds.xsd.sxbuiltin.XString)
 
     # Method parameters as read from a method object.
     assert len(service.ports) == 1
     port, methods = service.ports[0]
     assert len(methods) == 1
-    method = methods[0]
-    assert len(method) == 2
-    method_name = method[0]
+    method_name, method_params = methods[0]
     assert method_name == "f"
-    method_params = method[1]
     assert len(method_params) == 3
     assert method_params[0][0] == "x1"
     assert method_params[0][1] is service.params[0][0]
@@ -551,8 +584,8 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
 
 
 def test_function_parameters_sequence_in_a_choice():
-    client = _client_from_wsdl(
-"""<?xml version='1.0' encoding='UTF-8'?>
+    client = tests.client_from_wsdl(suds.byte_str("""\
+<?xml version='1.0' encoding='UTF-8'?>
 <wsdl:definitions targetNamespace="my-namespace"
 xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
 xmlns:ns="my-namespace"
@@ -604,11 +637,12 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
     </wsdl:port>
   </wsdl:service>
 </wsdl:definitions>
-""")
+"""))
 
     # Input #1.
-    request = _construct_SOAP_request(client, 'f', a1="Wackadoodle")
-    assert request.str() == """<?xml version="1.0" encoding="UTF-8"?>
+    tests.compare_xml_to_string(_construct_SOAP_request(client, 'f',
+        a1="Wackadoodle"), """\
+<?xml version="1.0" encoding="UTF-8"?>
 <SOAP-ENV:Envelope xmlns:ns0="my-namespace" xmlns:ns1="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/">
    <SOAP-ENV:Header/>
    <ns1:Body>
@@ -616,13 +650,14 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
          <ns0:a1>Wackadoodle</ns0:a1>
       </ns0:Choice>
    </ns1:Body>
-</SOAP-ENV:Envelope>"""
+</SOAP-ENV:Envelope>""")
 
     # Input #2.
     param = client.factory.create("Choice.sequence")
     param.e2 = "Wackadoodle"
-    request = _construct_SOAP_request(client, 'f', sequence=param)
-    assert request.str() == """<?xml version="1.0" encoding="UTF-8"?>
+    tests.compare_xml_to_string(_construct_SOAP_request(client, 'f',
+        sequence=param), """\
+<?xml version="1.0" encoding="UTF-8"?>
 <SOAP-ENV:Envelope xmlns:ns0="my-namespace" xmlns:ns1="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/">
    <SOAP-ENV:Header/>
    <ns1:Body>
@@ -634,12 +669,12 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
          </ns0:sequence>
       </ns0:Choice>
    </ns1:Body>
-</SOAP-ENV:Envelope>"""
+</SOAP-ENV:Envelope>""")
 
 
 def test_function_parameters_sequence_in_a_choice_in_a_sequence():
-    client = _client_from_wsdl(
-"""<?xml version='1.0' encoding='UTF-8'?>
+    client = tests.client_from_wsdl(suds.byte_str("""\
+<?xml version='1.0' encoding='UTF-8'?>
 <wsdl:definitions targetNamespace="my-namespace"
 xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
 xmlns:ns="my-namespace"
@@ -697,7 +732,7 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
     </wsdl:port>
   </wsdl:service>
 </wsdl:definitions>
-""")
+"""))
 
     # Construct input parameters.
     param = client.factory.create("External.choice")
@@ -705,8 +740,9 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
     param.sequence.e2 = "Wackadoodle"
 
     # Construct a SOAP request containing our input parameters.
-    request = _construct_SOAP_request(client, 'f', param)
-    assert request.str() == """<?xml version="1.0" encoding="UTF-8"?>
+    tests.compare_xml_to_string(_construct_SOAP_request(client, 'f', param),
+        """\
+<?xml version="1.0" encoding="UTF-8"?>
 <SOAP-ENV:Envelope xmlns:ns0="my-namespace" xmlns:ns1="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/">
    <SOAP-ENV:Header/>
    <ns1:Body>
@@ -720,12 +756,12 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
          </ns0:choice>
       </ns0:External>
    </ns1:Body>
-</SOAP-ENV:Envelope>"""
+</SOAP-ENV:Envelope>""")
 
 
 def test_function_parameters_strings():
-    client = _client_from_wsdl(
-"""<?xml version='1.0' encoding='UTF-8'?>
+    client = tests.client_from_wsdl(suds.byte_str("""\
+<?xml version='1.0' encoding='UTF-8'?>
 <wsdl:definitions targetNamespace="my-namespace"
 xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
 xmlns:ns="my-namespace"
@@ -769,7 +805,7 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
     </wsdl:port>
   </wsdl:service>
 </wsdl:definitions>
-""")
+"""))
 
     service = client.sd[0]
     assert not service.types
@@ -777,27 +813,21 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
     # Method parameters as read from the service definition.
     assert len(service.params) == 3
     assert service.params[0][0].name == "x1"
-    assert service.params[0][0].type[0] == "string"
-    assert service.params[0][0].type[1] == "http://www.w3.org/2001/XMLSchema"
+    assert service.params[0][0].type == _string_type
     assert isinstance(service.params[0][1], suds.xsd.sxbuiltin.XString)
     assert service.params[1][0].name == "x2"
-    assert service.params[1][0].type[0] == "string"
-    assert service.params[1][0].type[1] == "http://www.w3.org/2001/XMLSchema"
+    assert service.params[1][0].type == _string_type
     assert isinstance(service.params[1][1], suds.xsd.sxbuiltin.XString)
     assert service.params[2][0].name == "x3"
-    assert service.params[2][0].type[0] == "string"
-    assert service.params[2][0].type[1] == "http://www.w3.org/2001/XMLSchema"
+    assert service.params[2][0].type == _string_type
     assert isinstance(service.params[2][1], suds.xsd.sxbuiltin.XString)
 
     # Method parameters as read from a method object.
     assert len(service.ports) == 1
     port, methods = service.ports[0]
     assert len(methods) == 1
-    method = methods[0]
-    assert len(method) == 2
-    method_name = method[0]
+    method_name, method_params = methods[0]
     assert method_name == "f"
-    method_params = method[1]
     assert len(method_params) == 3
     assert method_params[0][0] == "x1"
     assert method_params[0][1] is service.params[0][0]
@@ -808,8 +838,8 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
 
 
 def test_global_enumeration():
-    client = _client_from_wsdl(
-"""<?xml version='1.0' encoding='UTF-8'?>
+    client = tests.client_from_wsdl(suds.byte_str("""\
+<?xml version='1.0' encoding='UTF-8'?>
 <wsdl:definitions targetNamespace="my-namespace"
 xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
 xmlns:ns="my-namespace"
@@ -840,7 +870,7 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
     </wsdl:port>
   </wsdl:service>
 </wsdl:definitions>
-""")
+"""))
 
     assert len(client.sd) == 1
     service = client.sd[0]
@@ -862,8 +892,7 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
 
     assert len(aType.rawchildren) == 1
     assert isinstance(aType.rawchildren[0], suds.xsd.sxbasic.Restriction)
-    assert aType.rawchildren[0].ref[0] == "string"
-    assert aType.rawchildren[0].ref[1] == "http://www.w3.org/2001/XMLSchema"
+    assert aType.rawchildren[0].ref == _string_type
 
     enum = client.factory.create("AAA")
     assert enum.One == "One"
@@ -872,8 +901,8 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
 
 
 def test_global_sequence_in_a_global_sequence():
-    client = _client_from_wsdl(
-"""<?xml version='1.0' encoding='UTF-8'?>
+    client = tests.client_from_wsdl(suds.byte_str("""\
+<?xml version='1.0' encoding='UTF-8'?>
 <wsdl:definitions targetNamespace="my-namespace"
 xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
 xmlns:ns="my-namespace"
@@ -911,7 +940,7 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
     </wsdl:port>
   </wsdl:service>
 </wsdl:definitions>
-""")
+"""))
 
     service = client.sd[0]
 
@@ -938,14 +967,11 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
     assert isinstance(children, list)
     assert len(children) == 3
     assert children[0][0].name == "x1"
-    assert children[0][0].type[0] == "string"
-    assert children[0][0].type[1] == "http://www.w3.org/2001/XMLSchema"
+    assert children[0][0].type == _string_type
     assert children[1][0].name == "x2"
-    assert children[1][0].type[0] == "Oklahoma"
-    assert children[1][0].type[1] == "my-namespace"
+    assert children[1][0].type == ("Oklahoma", "my-namespace")
     assert children[2][0].name == "x3"
-    assert children[2][0].type[0] == "string"
-    assert children[2][0].type[1] == "http://www.w3.org/2001/XMLSchema"
+    assert children[2][0].type == _string_type
 
     sequenceOut = client.factory.create("Wackadoodle")
     _assert_dynamic_type(sequenceOut, "Wackadoodle")
@@ -961,8 +987,8 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
 
 
 def test_global_string_sequence():
-    client = _client_from_wsdl(
-"""<?xml version='1.0' encoding='UTF-8'?>
+    client = tests.client_from_wsdl(suds.byte_str("""\
+<?xml version='1.0' encoding='UTF-8'?>
 <wsdl:definitions targetNamespace="my-namespace"
 xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
 xmlns:ns="my-namespace"
@@ -993,7 +1019,7 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
     </wsdl:port>
   </wsdl:service>
 </wsdl:definitions>
-""")
+"""))
 
     service = client.sd[0]
 
@@ -1021,14 +1047,11 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
     assert isinstance(sequence_items, list)
     assert len(sequence_items) == 3
     assert sequence_items[0][0].name == "c1"
-    assert sequence_items[0][0].type[0] == "string"
-    assert sequence_items[0][0].type[1] == "http://www.w3.org/2001/XMLSchema"
+    assert sequence_items[0][0].type == _string_type
     assert sequence_items[1][0].name == "c2"
-    assert sequence_items[1][0].type[0] == "string"
-    assert sequence_items[1][0].type[1] == "http://www.w3.org/2001/XMLSchema"
+    assert sequence_items[1][0].type == _string_type
     assert sequence_items[2][0].name == "c3"
-    assert sequence_items[2][0].type[0] == "string"
-    assert sequence_items[2][0].type[1] == "http://www.w3.org/2001/XMLSchema"
+    assert sequence_items[2][0].type == _string_type
 
     sequence = client.factory.create("Oklahoma")
     getattr(sequence, "c1")
@@ -1039,15 +1062,15 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
     assert sequence.c2 is None
     assert sequence.c3 is None
     sequence.c1 = "Pero"
-    sequence.c3 = "Ždero"
+    sequence.c3 = "Zdero"
     assert sequence.c1 == "Pero"
     assert sequence.c2 is None
-    assert sequence.c3 == "Ždero"
+    assert sequence.c3 == "Zdero"
 
 
 def test_local_sequence_in_a_global_sequence():
-    client = _client_from_wsdl(
-"""<?xml version='1.0' encoding='UTF-8'?>
+    client = tests.client_from_wsdl(suds.byte_str("""\
+<?xml version='1.0' encoding='UTF-8'?>
 <wsdl:definitions targetNamespace="my-namespace"
 xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
 xmlns:ns="my-namespace"
@@ -1091,7 +1114,7 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
     </wsdl:port>
   </wsdl:service>
 </wsdl:definitions>
-""")
+"""))
 
     service = client.sd[0]
     assert len(service.types) == 1
@@ -1137,8 +1160,8 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
 
 
 def test_no_trailing_comma_in_function_prototype_description_string__0():
-    client = _client_from_wsdl(
-"""<?xml version='1.0' encoding='UTF-8'?>
+    client = tests.client_from_wsdl(suds.byte_str("""\
+<?xml version='1.0' encoding='UTF-8'?>
 <wsdl:definitions targetNamespace="my-namespace"
 xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
 xmlns:ns="my-namespace"
@@ -1178,14 +1201,14 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
     </wsdl:port>
   </wsdl:service>
 </wsdl:definitions>
-""")
+"""))
     s = str(client)
     assert " f()\n" in s
 
 
 def test_no_trailing_comma_in_function_prototype_description_string__1():
-    client = _client_from_wsdl(
-"""<?xml version='1.0' encoding='UTF-8'?>
+    client = tests.client_from_wsdl(suds.byte_str("""\
+<?xml version='1.0' encoding='UTF-8'?>
 <wsdl:definitions targetNamespace="my-namespace"
 xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
 xmlns:ns="my-namespace"
@@ -1227,14 +1250,14 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
     </wsdl:port>
   </wsdl:service>
 </wsdl:definitions>
-""")
+"""))
     s = str(client)
     assert " f(xs:string x1)\n" in s
 
 
 def test_no_trailing_comma_in_function_prototype_description_string__3():
-    client = _client_from_wsdl(
-"""<?xml version='1.0' encoding='UTF-8'?>
+    client = tests.client_from_wsdl(suds.byte_str("""\
+<?xml version='1.0' encoding='UTF-8'?>
 <wsdl:definitions targetNamespace="my-namespace"
 xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
 xmlns:ns="my-namespace"
@@ -1278,14 +1301,14 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
     </wsdl:port>
   </wsdl:service>
 </wsdl:definitions>
-""")
+"""))
     s = str(client)
     assert " f(xs:string x1, xs:string x2, xs:string x3)\n" in s
 
 
 def test_no_types():
-    client = _client_from_wsdl(
-"""<?xml version='1.0' encoding='UTF-8'?>
+    client = tests.client_from_wsdl(suds.byte_str("""\
+<?xml version='1.0' encoding='UTF-8'?>
 <wsdl:definitions targetNamespace="my-namespace"
 xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
 xmlns:ns="my-namespace"
@@ -1308,7 +1331,7 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
     </wsdl:port>
   </wsdl:service>
 </wsdl:definitions>
-""")
+"""))
 
     assert len(client.sd) == 1
     service = client.sd[0]
@@ -1321,51 +1344,93 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
 
 def test_parameter_referencing_missing_element():
     try:
-        client = _client_from_wsdl(
-"""<?xml version='1.0' encoding='UTF-8'?>
-<wsdl:definitions targetNamespace="my-namespace"
-xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
-xmlns:ns="my-namespace"
-xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
-  <wsdl:types>
-    <xsd:schema targetNamespace="my-namespace"
-    elementFormDefault="qualified"
-    attributeFormDefault="unqualified"
-    xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-    </xsd:schema>
-  </wsdl:types>
-  <wsdl:message name="fRequestMessage">
-    <wsdl:part name="parameters" element="ns:missingElement" />
-  </wsdl:message>
-  <wsdl:portType name="dummyPortType">
-    <wsdl:operation name="f">
-      <wsdl:input message="ns:fRequestMessage" />
-    </wsdl:operation>
-  </wsdl:portType>
-  <wsdl:binding name="dummy" type="ns:dummyPortType">
-    <soap:binding style="document"
-    transport="http://schemas.xmlsoap.org/soap/http" />
-    <wsdl:operation name="f">
-      <soap:operation soapAction="f" style="document" />
-      <wsdl:input><soap:body use="literal" /></wsdl:input>
-      <wsdl:output><soap:body use="literal" /></wsdl:output>
-    </wsdl:operation>
-  </wsdl:binding>
-  <wsdl:service name="dummy">
-    <wsdl:port name="dummy" binding="ns:dummy">
-      <soap:address location="https://localhost/dummy" />
-    </wsdl:port>
-  </wsdl:service>
-</wsdl:definitions>
-""")
-        pytest.fail("Excepted exception suds.TypeNotFound not thrown.")
+        tests.client_from_wsdl(tests.wsdl_input("", "missingElement"))
     except suds.TypeNotFound, e:
         assert str(e) == "Type not found: '(missingElement, my-namespace, )'"
+    else:
+        pytest.fail("Expected exception suds.TypeNotFound not raised.")
+
+
+# TODO: Update the current restriction type input parameter handling so they get
+# 'unwrapped' correctly instead of each of their enumeration values getting
+# interpreted as a separate input parameter.
+@pytest.mark.xfail
+def test_restrictions():
+    client_unnamed = tests.client_from_wsdl(tests.wsdl_input("""\
+      <xsd:element name="Elemento">
+        <xsd:simpleType>
+          <xsd:restriction base="xsd:int">
+            <xsd:enumeration value="1" />
+            <xsd:enumeration value="3" />
+            <xsd:enumeration value="5" />
+          </xsd:restriction>
+        </xsd:simpleType>
+      </xsd:element>""", "Elemento"))
+
+    client_named = tests.client_from_wsdl(tests.wsdl_input("""\
+      <xsd:simpleType name="MyType">
+        <xsd:restriction base="xsd:int">
+          <xsd:enumeration value="1" />
+          <xsd:enumeration value="3" />
+          <xsd:enumeration value="5" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:element name="Elemento" type="ns:MyType" />""", "Elemento"))
+
+    client_twice_restricted = tests.client_from_wsdl(tests.wsdl_input("""\
+      <xsd:simpleType name="MyTypeGeneric">
+        <xsd:restriction base="xsd:int">
+          <xsd:enumeration value="1" />
+          <xsd:enumeration value="2" />
+          <xsd:enumeration value="3" />
+          <xsd:enumeration value="4" />
+          <xsd:enumeration value="5" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="MyType">
+        <xsd:restriction base="ns:MyTypeGeneric">
+          <xsd:enumeration value="1" />
+          <xsd:enumeration value="3" />
+          <xsd:enumeration value="5" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:element name="Elemento" type="ns:MyType" />""", "Elemento"))
+
+    element_qref = ("Elemento", "my-namespace")
+    type_named_qref = ("MyType", "my-namespace")
+
+    element_unnamed = client_unnamed.wsdl.schema.elements[element_qref]
+    element_named = client_named.wsdl.schema.elements[element_qref]
+    element_twice_restricted = client_twice_restricted.wsdl.schema.elements[
+        element_qref]
+
+    type_unnamed = element_unnamed.resolve()
+    type_named = element_named.resolve()
+    type_twice_restricted = element_twice_restricted.resolve()
+    assert type_unnamed is element_unnamed
+    assert type_named is client_named.wsdl.schema.types[type_named_qref]
+    assert type_twice_restricted is client_twice_restricted.wsdl.schema.types[
+        type_named_qref]
+
+    #   Regression test against suds automatically unwrapping input parameter
+    # type's enumeration values as separate parameters.
+    params_unnamed = client_unnamed.sd[0].params
+    params_named = client_named.sd[0].params
+    params_twice_restricted = client_twice_restricted.sd[0].params
+    assert len(params_unnamed) == 1
+    assert len(params_named) == 1
+    assert len(params_twice_restricted) == 1
+    assert params_unnamed[0][0] is element_unnamed
+    assert params_unnamed[0][1] is type_unnamed
+    assert params_named[0][0] is element_named
+    assert params_named[0][1] is type_named
+    assert params_twice_restricted[0][0] is element_twice_restricted
+    assert params_twice_restricted[0][1] is type_twice_restricted
 
 
 def test_schema_node_occurrences():
-    client = _client_from_wsdl(
-"""<?xml version='1.0' encoding='UTF-8'?>
+    client = tests.client_from_wsdl(suds.byte_str("""\
+<?xml version='1.0' encoding='UTF-8'?>
 <wsdl:definitions targetNamespace="my-namespace"
 xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
 xmlns:ns="my-namespace"
@@ -1402,7 +1467,7 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
     </xsd:schema>
   </wsdl:types>
 </wsdl:definitions>
-""")
+"""))
     schema = client.wsdl.schema
 
     def a(schema, name, min=None, max=None):
@@ -1453,8 +1518,8 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
 
 
 def test_schema_node_resolve():
-    client = _client_from_wsdl(
-"""<?xml version='1.0' encoding='UTF-8'?>
+    client = tests.client_from_wsdl(suds.byte_str("""\
+<?xml version='1.0' encoding='UTF-8'?>
 <wsdl:definitions targetNamespace="my-namespace"
 xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
 xmlns:ns="my-namespace"
@@ -1491,7 +1556,7 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
     </xsd:schema>
   </wsdl:types>
 </wsdl:definitions>
-""")
+"""))
     schema = client.wsdl.schema
 
     # Collect references to the test schema type nodes.
@@ -1534,8 +1599,8 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
 
 
 def test_schema_node_resolve__nobuiltin_caching():
-    client = _client_from_wsdl(
-"""<?xml version='1.0' encoding='UTF-8'?>
+    client = tests.client_from_wsdl(suds.byte_str("""\
+<?xml version='1.0' encoding='UTF-8'?>
 <wsdl:definitions targetNamespace="my-namespace"
 xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
 xmlns:ns="my-namespace"
@@ -1552,7 +1617,7 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
     </xsd:schema>
   </wsdl:types>
 </wsdl:definitions>
-""")
+"""))
     schema = client.wsdl.schema
 
     # Collect references to the test schema element nodes.
@@ -1582,8 +1647,8 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
 
 
 def test_schema_node_resolve__invalid_type():
-    client = _client_from_wsdl(
-"""<?xml version='1.0' encoding='UTF-8'?>
+    client = tests.client_from_wsdl(suds.byte_str("""\
+<?xml version='1.0' encoding='UTF-8'?>
 <wsdl:definitions targetNamespace="my-namespace"
 xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
 xmlns:ns="my-namespace"
@@ -1599,7 +1664,7 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
     </xsd:schema>
   </wsdl:types>
 </wsdl:definitions>
-""")
+"""))
     schema = client.wsdl.schema
     assert len(schema.elements) == 3
     elemento1 = schema.elements["Elemento1", "my-namespace"]
@@ -1611,8 +1676,8 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
 
 
 def test_schema_node_resolve__references():
-    client = _client_from_wsdl(
-"""<?xml version='1.0' encoding='UTF-8'?>
+    client = tests.client_from_wsdl(suds.byte_str("""\
+<?xml version='1.0' encoding='UTF-8'?>
 <wsdl:definitions targetNamespace="my-namespace"
 xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
 xmlns:ns="my-namespace"
@@ -1642,7 +1707,7 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
     </xsd:schema>
   </wsdl:types>
 </wsdl:definitions>
-""")
+"""))
     schema = client.wsdl.schema
 
     # Collect references to the test schema element & type nodes.
@@ -1687,8 +1752,8 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
 
 
 def test_schema_object_child_access_by_index():
-    client = _client_from_wsdl(
-"""<?xml version='1.0' encoding='UTF-8'?>
+    client = tests.client_from_wsdl(suds.byte_str("""\
+<?xml version='1.0' encoding='UTF-8'?>
 <wsdl:definitions targetNamespace="my-namespace"
 xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
 xmlns:ns="my-namespace"
@@ -1719,7 +1784,7 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
     </wsdl:port>
   </wsdl:service>
 </wsdl:definitions>
-""")
+"""))
 
     service = client.sd[0]
     aType = service.types[0][0]
@@ -1756,8 +1821,8 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
 
 
 def test_simple_wsdl():
-    client = _client_from_wsdl(
-"""<?xml version='1.0' encoding='UTF-8'?>
+    client = tests.client_from_wsdl(suds.byte_str("""\
+<?xml version='1.0' encoding='UTF-8'?>
 <wsdl:definitions targetNamespace="my-namespace"
 xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
 xmlns:ns="my-namespace"
@@ -1811,7 +1876,7 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
     </wsdl:port>
   </wsdl:service>
 </wsdl:definitions>
-""")
+"""))
 
     # Target namespace.
     assert client.wsdl.tns[0] == "ns"
@@ -1825,6 +1890,17 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
     assert isinstance(elementOut, suds.xsd.sxbasic.Element)
     assert elementIn.name == "f"
     assert elementOut.name == "fResponse"
+    assert len(elementIn.children()) == 2
+    param_in_1 = elementIn.children()[0][0]
+    param_in_2 = elementIn.children()[1][0]
+    assert param_in_1.name == "a"
+    assert param_in_1.type == _string_type
+    assert param_in_2.name == "b"
+    assert param_in_2.type == _string_type
+    assert len(elementOut.children()) == 1
+    param_out_1 = elementOut.children()[0][0]
+    assert param_out_1.name == "c"
+    assert param_out_1.type == _string_type
 
     # Service definition.
     assert len(client.sd) == 1
@@ -1845,32 +1921,47 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
 
     # Methods (from wsdl).
     assert len(port.methods) == 1
-    method_name, method = _first_from_dict(port.methods)
-    assert method_name == "f"
+    method = port.methods["f"]
     assert method.name == "f"
-    assert method.location == b"https://localhost/dummy"
+    assert method.location == "https://localhost/dummy"
+
+    # Operations (from wsdl).
+    assert len(client.wsdl.bindings) == 1
+    binding_qname, binding = _first_from_dict(client.wsdl.bindings)
+    assert binding_qname == ("dummy", "my-namespace")
+    assert binding.__class__ is suds.wsdl.Binding
+    assert len(binding.operations) == 1
+    operation = binding.operations.values()[0]
+    input = operation.soap.input.body
+    output = operation.soap.output.body
+    assert len(input.parts) == 1
+    assert len(output.parts) == 1
+    input_element_qname = input.parts[0].element
+    output_element_qname = output.parts[0].element
+    assert input_element_qname == elementIn.qname
+    assert output_element_qname == elementOut.qname
 
     # Methods (from service definition, for format specifications see the
-    # suds.ServiceDefinition.addports() docstring).
+    # suds.serviceDefinition.ServiceDefinition.addports() docstring).
     port, methods = service_definition.ports[0]
     assert len(methods) == 1
-    method = methods[0]
-    assert len(method) == 2
-    method_name = method[0]
+    method_name, method_params = methods[0]
     assert method_name == "f"
-    method_params = method[1]
-    assert len(method_params) == 2
-    assert method_params[0][0] == "a"
-    assert method_params[1][0] == "b"
 
-    # TODO: Once we learn more about suds - add the following assertions:
-    #   * assert method.input parameters = a (string), b (string).
-    #   * assert method.output parameters = c (string).
+    param_name, param_element, param_choice = method_params[0]
+    assert param_name == "a"
+    assert param_element is param_in_1
+    assert param_choice == False
+
+    param_name, param_element, param_choice = method_params[1]
+    assert param_name == "b"
+    assert param_element is param_in_2
+    assert param_choice == False
 
 
 def test_wsdl_schema_content():
-    client = _client_from_wsdl(
-"""<?xml version='1.0' encoding='UTF-8'?>
+    client = tests.client_from_wsdl(suds.byte_str("""\
+<?xml version='1.0' encoding='UTF-8'?>
 <wsdl:definitions targetNamespace="my-namespace"
 xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
 xmlns:ns="my-namespace"
@@ -1911,7 +2002,7 @@ xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
     </xsd:schema>
   </wsdl:types>
 </wsdl:definitions>
-""")
+"""))
 
     # Elements.
     assert len(client.wsdl.schema.elements) == 1
@@ -1944,34 +2035,6 @@ def _assert_dynamic_type(anObject, typename):
     assert anObject.__class__.__name__ == typename
 
 
-def _client_from_wsdl(wsdl_content):
-    """
-    Constructs a non-caching suds Client based on the given WSDL content.
-
-      Stores the content directly inside the suds library internal document
-    store under a hard-coded id to avoid having to load the data from a
-    temporary file.
-
-      Caveats:
-        * All files stored under the same id so each new local file overwrites
-          the previous one.
-        * We need to explicitly disable caching here or otherwise, because we
-          are using the same id for all our local WSDL documents, suds would
-          always reuse the first such local document from its cache.
-
-    """
-    # Idea for an alternative implementation:
-    #   Custom suds.cache.Cache subclass that would know how to access our
-    # locally stored documents or at least not cache them if we are storing
-    # them inside the suds library DocumentStore. Not difficult, allows us to
-    # have per-client instead of global configuration & allows us to support
-    # other cache types but certainly not as short as the current
-    # implementation.
-    testFileId = "whatchamacallit"
-    suds.store.DocumentStore.store[testFileId] = wsdl_content
-    return suds.client.Client("suds://" + testFileId, cache=None)
-
-
 def _construct_SOAP_request(client, operation_name, *args, **kwargs):
     """
     Returns a SOAP request for a given web service operation invocation.
@@ -1990,9 +2053,9 @@ def _element_node_xml(name, min=None, max=None):
     s.append(name)
     s.append('" type="xsd:string" ')
     if min is not None:
-        s.append('minOccurs="{}" '.format(min))
+        s.append('minOccurs="%s" ' % (min,))
     if max is not None:
-        s.append('maxOccurs="{}" '.format(max))
+        s.append('maxOccurs="%s" ' % (max,))
     s.append('/>\n')
     return ''.join(s)
 
@@ -2001,3 +2064,6 @@ def _first_from_dict(d):
     """Returns the first name/value pair from a dictionary or None if empty."""
     for x in d.items():
         return x[0], x[1]
+
+
+_string_type = ("string", "http://www.w3.org/2001/XMLSchema")

@@ -125,7 +125,7 @@ class SchemaCollection(UnicodeMixin):
         the namespace is compared to each schema's I{targetNamespace}
         @param ns: A namespace.
         @type ns: (prefix,URI)
-        @return: The schema matching the namesapce, else None.
+        @return: The schema matching the namespace, else None.
         @rtype: L{Schema}
         """
         return self.namespaces.get(ns[1])
@@ -335,7 +335,7 @@ class Schema(UnicodeMixin):
         The request is passed to the container.
         @param ns: A namespace.
         @type ns: (prefix,URI)
-        @return: The schema matching the namesapce, else None.
+        @return: The schema matching the namespace, else None.
         @rtype: L{Schema}
         """
         if self.container is not None:
@@ -406,8 +406,7 @@ class Schema(UnicodeMixin):
         return '\n'.join(result)
 
     def __repr__(self):
-        myrep = '<%s tns="%s"/>' % (self.id, self.tns[1])
-        return str_to_utf8_in_py2(myrep)
+        return '<%s tns="%s"/>' % (self.id, self.tns[1])
 
     def __unicode__(self):
         return self.str()

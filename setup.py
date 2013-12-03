@@ -16,12 +16,34 @@
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 # written by: Jeff Ortel ( jortel@redhat.com )
 
+# Automatically download & install an appropriate setuptools version if needed.
+import ez_setup
+ez_setup.use_setuptools()
+
+# 'setuptools' related packages.
+import pkg_resources
+from setuptools import setup, find_packages
+
 import os
 import os.path
 import sys
 
-import pkg_resources
-from setuptools import setup, find_packages
+
+def read_python_code(filename):
+    "Returns the given Python source file's compiled content."
+    file = open(filename, "rt")
+    try:
+        source = file.read()
+    finally:
+        file.close()
+    #   Python 2.6 and below did not support passing strings to exec() &
+    # compile() functions containing line separators other than '\n'. To
+    # support them we need to manually make sure such line endings get
+    # converted even on platforms where this is not handled by native text file
+    # read operations.
+    source = source.replace("\r\n", "\n").replace("\r", "\n")
+    return compile(source, filename, "exec")
+
 
 # Setup documentation incorrectly states that it will search for packages
 # relative to the setup script folder by default when in fact it will search
@@ -36,14 +58,14 @@ from setuptools import setup, find_packages
 #     parameters makes the final installed distribution contain the absolute
 #     package source location information and not include some other meta-data
 #     package information as well.
-script_folder = os.path.abspath(os.path.dirname(__file__))
-current_folder = os.path.abspath(os.getcwd())
+script_folder = os.path.realpath(os.path.dirname(__file__))
+current_folder = os.path.realpath(os.getcwd())
 if script_folder != current_folder:
     print("ERROR: Suds library setup script needs to be run from the folder "
         "containing it.")
     print()
-    print("Current folder: {}".format(current_folder))
-    print("Script folder: {}".format(script_folder))
+    print("Current folder: %s" % current_folder)
+    print("Script folder: %s" % script_folder)
     sys.exit(-2)
 
 # Load the suds library version information directly into this module without
@@ -56,11 +78,45 @@ if script_folder != current_folder:
 #     forcing the user to install them manually (since the setup procedure that
 #     is supposed to install them automatically will not be able to run unless
 #     they are already installed).
-exec(open(os.path.join("suds", "version.py"), "rt").read())
+#   We execute explicitly compiled source code instead of having the exec()
+# function compile it to get a better error messages. If we used exec() on the
+# source code directly, the source file would have been listed as just
+# '<string>'.
+exec(read_python_code(os.path.join("suds", "version.py")))
 
-extra = {}
-if sys.version_info >= (3,0):
-    extra["use_2to3"] = True
+extra_setup_params = {}
+extra_setup_cmdclass = {}
+
+if sys.version_info < (2, 4, 4):
+    # Python 2.4.3 seems to have issues with setuptools collecting its
+    # requirement packages from PyPI using HTTPS. This has been encountered
+    # using Python 2.4.3/x86 on Windows 7/SP1/x64 with setuptools 0.7.2. The
+    # same issue does not occur when using Python 2.4.4/x86 in the same
+    # environment.
+    #
+    # As a workaround we replace setuptools's PackageIndex class with one that
+    # always uses the HTTP transfer protocol instead of HTTPS when dealing with
+    # this Python version.
+    #
+    # Note that this workaround affects only setuptools's automated requirement
+    # package downloading. Any requirement packages can still be installed
+    # manually by the user, using a suitable package index source URL.
+    import setuptools.package_index
+    OriginalPackageIndex = setuptools.package_index.PackageIndex
+    class NoHTTPSPackageIndex(OriginalPackageIndex):
+        def __init__(self, *args, **kwargs):
+            OriginalPackageIndex.__init__(self, *args, **kwargs)
+            cue = "https:"
+            if self.index_url.lower().startswith(cue):
+                self.index_url = "http:" + self.index_url[len(cue):]
+    setuptools.package_index.PackageIndex = NoHTTPSPackageIndex
+
+if sys.version_info >= (2, 5):
+    # distutils.setup() 'obsoletes' parameter not introduced until Python 2.5.
+    extra_setup_params["obsoletes"] = ["suds"]
+
+if sys.version_info >= (3, 0):
+    extra_setup_params["use_2to3"] = True
 
     #   Teach Python's urllib lib2to3 fixer that the old urllib2.__version__
     # data member is now stored in the urllib.request module.
@@ -94,16 +150,37 @@ package_name = "suds-jurko"
 version_tag = pkg_resources.safe_version(__version__)
 project_url = "https://bitbucket.org/jurko/suds"
 base_download_url = project_url + "/downloads"
-download_distribution_name = "{}-{}.tar.bz2".format(package_name, version_tag)
-download_url = "{}/{}".format(base_download_url, download_distribution_name)
-packages_excluded_from_build = []
+download_distribution_name = "%s-%s.tar.bz2" % (package_name, version_tag)
+download_url = "%s/%s" % (base_download_url, download_distribution_name)
 
-#   We generally do not want the tests package or any of its subpackages
-# included in our non-source package builds (source distribution content gets
-# specified separately via the MANIFEST.ini configuration file). Comment out
-# the following line to include the test code anyway, e.g. if you want to run
-# Python 3 based tests from the package build folder.
-packages_excluded_from_build += ["tests", "tests.*"]
+# Support for integrating running the project' pytest based test suite directly
+# into this setup script so the test suite can be run by 'setup.py test'. Since
+# Python's distutils framework does not allow passing all received command-line
+# arguments to its commands, it does not seem easy to customize how pytest runs
+# its tests this way. To have better control over this, user should run the
+# pytest on the target source tree directly, possibly after first building a
+# temporary one to work around problems like Python 2/3 compatibility.
+import setuptools.command.test
+class PyTest(setuptools.command.test.test):
+    def finalize_options(self):
+        setuptools.command.test.test.finalize_options(self)
+        self.test_args = []
+        self.test_suite = True
+    def run_tests(self):
+        # Make sure the tests are run on the correct test sources. E.g. when
+        # using Python 3, the tests need to be run in the temporary build
+        # folder where they have been previously processed using py2to3.
+        # Running them directly on the original source tree would fail due to
+        # Python 2/3 source code incompatibility.
+        ei_cmd = self.get_finalized_command("egg_info")
+        build_path = setuptools.command.test.normalize_path(ei_cmd.egg_base)
+        test_args = ["--pyargs", build_path]
+        import pytest
+        errno = pytest.main(test_args)
+        sys.exit(errno)
+extra_setup_params.update(tests_require=["pytest"])
+extra_setup_cmdclass.update(test=PyTest)
+
 
 setup(
     name=package_name,
@@ -113,10 +190,7 @@ setup(
     keywords=["SOAP", "web", "service", "client"],
     url=project_url,
     download_url=download_url,
-    obsoletes=["suds"],
-    setup_requires=["distribute"],
-    tests_require=["pytest"],
-    packages=find_packages(exclude=packages_excluded_from_build),
+    packages=find_packages(),
 
     # 'maintainer' will be listed as the distribution package author.
     # Warning: Due to a 'distribute' package defect when used with Python 3
@@ -127,6 +201,10 @@ setup(
     # the user's default system code-page, e.g. typically CP1250 on eastern
     # European Windows, CP1252 on western European Windows, UTF-8 on Linux or
     # any other.
+    #
+    # 'distribute' package merged back with the 'setuptools' package in the
+    # setuptools 0.7 release but we have not yet checked whether this bug has
+    # been corrected there or not.
     author="Jeff Ortel",
     author_email="jortel@redhat.com",
     maintainer="Jurko Gospodnetic",
@@ -151,12 +229,16 @@ setup(
         "Programming Language :: Python :: 3.0",
         "Programming Language :: Python :: 3.1",
         "Programming Language :: Python :: 3.2",
+        "Programming Language :: Python :: 3.3",
         "Topic :: Internet"],
 
-    #   PEP-314 states that if possible license & plaform should be specified
+    #   PEP-314 states that if possible license & platform should be specified
     # using 'classifiers'.
     license="(specified using classifiers)",
     platforms=["(specified using classifiers)"],
 
-    **extra
+    # Register custom distutils commands.
+    cmdclass=extra_setup_cmdclass,
+
+    **extra_setup_params
 )

@@ -5,17 +5,7 @@
 # tried out did not work correctly with Python 3.
 
 # Top level project files.
-include .hgignore
-include .hgtags
-include .project
-include .pydevproject
+include ez_setup.py
 include HACKING.txt
 include LICENSE.txt
-include makefile
-include python-suds.spec
-include README.txt
-include sdist
 include TODO.txt
-
-# Test scripts explicitly not included in non-source distribution packages.
-recursive-include tests *.py

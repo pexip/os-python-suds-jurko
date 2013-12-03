@@ -18,15 +18,17 @@
 Contains classes for basic HTTP transport implementations.
 """
 
-import urllib2
-import base64
-import socket
-import sys
 from suds.transport import *
 from suds.properties import Unskin
 from urlparse import urlparse
 from cookielib import CookieJar
 from logging import getLogger
+
+import base64
+import httplib
+import socket
+import sys
+import urllib2
 
 log = getLogger(__name__)
 
@@ -56,7 +58,7 @@ class HttpTransport(Transport):
 
     def open(self, request):
         try:
-            url = request.url
+            url = self.__get_request_url(request)
             log.debug('opening (%s)', url)
             u2request = urllib2.Request(url)
             self.proxy = self.options.proxy
@@ -66,7 +68,7 @@ class HttpTransport(Transport):
 
     def send(self, request):
         result = None
-        url = request.url
+        url = self.__get_request_url(request)
         msg = request.message
         headers = request.headers
         try:
@@ -77,12 +79,14 @@ class HttpTransport(Transport):
             log.debug('sending:\n%s', request)
             fp = self.u2open(u2request)
             self.getcookies(fp, u2request)
-            headers = (fp.headers.dict if sys.version_info < (3, 0) 
-                       else fp.headers)
-            result = Reply(200, headers, fp.read())
+            if sys.version_info < (3, 0):
+                headers = fp.headers.dict
+            else:
+                headers = fp.headers
+            result = Reply(httplib.OK, headers, fp.read())
             log.debug('received:\n%s', result)
         except urllib2.HTTPError, e:
-            if e.code in (202,204):
+            if e.code in (httplib.ACCEPTED, httplib.NO_CONTENT):
                 result = None
             else:
                 raise TransportError(e.msg, e.code, e.fp)
@@ -117,8 +121,7 @@ class HttpTransport(Transport):
         if (sys.version_info < (3, 0)) and (self.u2ver() < 2.6):
             socket.setdefaulttimeout(tm)
             return url.open(u2request)
-        else:
-            return url.open(u2request, timeout=tm)
+        return url.open(u2request, timeout=tm)
 
     def u2opener(self):
         """
@@ -128,8 +131,7 @@ class HttpTransport(Transport):
         """
         if self.urlopener is None:
             return urllib2.build_opener(*self.u2handlers())
-        else:
-            return self.urlopener
+        return self.urlopener
 
     def u2handlers(self):
         """
@@ -149,8 +151,7 @@ class HttpTransport(Transport):
         """
         try:
             part = urllib2.__version__.split('.', 1)
-            n = float('.'.join(part))
-            return n
+            return float('.'.join(part))
         except Exception, e:
             log.exception(e)
             return 0
@@ -162,13 +163,38 @@ class HttpTransport(Transport):
         cp.update(p)
         return clone
 
+    @staticmethod
+    def __get_request_url(request):
+        """
+        Returns the given request's URL, properly encoded for use with urllib.
+
+        Python 2.7 httplib implementation expects the URL passed to it to not
+        be a unicode string. If it is, then passing it to the underlying
+        httplib Request object will cause that object to forcefully convert all
+        of its data to unicode, assuming that data contains ASCII data only and
+        raising a UnicodeDecodeError exception if it does not (caused by simple
+        unicode + string concatenation).
+
+        Additional notes:
+          * URLs in general may contain ASCII characters only.
+          * Python 2.4 httplib implementation does not really care about this
+            as it does not use the internal optimization present in the Python
+            2.7 implementation causing all the requested data to be converted
+            to unicode.
+          * Python 3.x httplib.client module implementation converts the URL
+            passed to it to a bytes object internally, using an explicitly
+            specified ASCII encoding.
+
+        """
+        return request.url.encode('ascii')
+
 
 class HttpAuthenticated(HttpTransport):
     """
-    Provides basic http authentication for servers that don't follow
-    the specified challenge / response model.  This implementation
-    appends the I{Authorization} http header with base64 encoded
-    credentials on every http request.
+    Provides basic HTTP authentication for servers that do not follow the
+    specified challenge/response model. This implementation appends the
+    I{Authorization} HTTP header with base64 encoded credentials on every HTTP
+    request.
     """
 
     def open(self, request):
@@ -182,8 +208,14 @@ class HttpAuthenticated(HttpTransport):
     def addcredentials(self, request):
         credentials = self.credentials()
         if not (None in credentials):
-            encoded = base64.encodestring(':'.join(credentials))
-            basic = 'Basic %s' % encoded[:-1]
+            credentials = ':'.join(credentials)
+            # Bytes and strings are different in Python 3 than in Python 2.x.
+            if sys.version_info < (3,0):
+                basic = 'Basic %s' % base64.b64encode(credentials)
+            else:
+                encodedBytes = base64.urlsafe_b64encode(credentials.encode())
+                encodedString = encodedBytes.decode()
+                basic = 'Basic %s' % encodedString
             request.headers['Authorization'] = basic
 
     def credentials(self):

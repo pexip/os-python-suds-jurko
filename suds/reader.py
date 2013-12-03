@@ -15,7 +15,8 @@
 # written by: Jeff Ortel ( jortel@redhat.com )
 
 """
-Contains xml document reader classes.
+  XML document reader classes providing integration with the suds library's
+caching system.
 """
 
 
@@ -32,7 +33,7 @@ log = getLogger(__name__)
 
 class Reader:
     """
-    The reader provides integration with cache.
+    Provides integration with the cache.
     @ivar options: An options object.
     @type options: I{Options}
     """
@@ -56,17 +57,15 @@ class Reader:
 
 class DocumentReader(Reader):
     """
-    The XML document reader provides an integration
-    between the SAX L{Parser} and the document cache.
+    Provides integration between the SAX L{Parser} and the document cache.
     """
 
     def open(self, url):
         """
         Open an XML document at the specified I{URL}.
-        First, the document attempted to be retrieved from
-        the I{object cache}.  If not found, it is downloaded and
-        parsed using the SAX parser.  The result is added to the
-        cache for the next open().
+        First, the document attempted to be retrieved from the I{object cache}.
+        If not found, it is downloaded and parsed using the SAX parser. The
+        result is added to the cache for the next open().
         @param url: A document URL.
         @type url: str.
         @return: The specified XML document.
@@ -89,12 +88,16 @@ class DocumentReader(Reader):
         @return: A file pointer to the document.
         @rtype: file-like
         """
-        store = DocumentStore()
-        fp = store.open(url)
-        if fp is None:
+        content = None
+        store = self.options.documentStore
+        if store is not None:
+            content = store.open(url)
+        if content is None:
             fp = self.options.transport.open(Request(url))
-        content = fp.read()
-        fp.close()
+            try:
+                content = fp.read()
+            finally:
+                fp.close()
         ctx = self.plugins.document.loaded(url=url, document=content)
         content = ctx.document
         sax = Parser()
@@ -103,19 +106,18 @@ class DocumentReader(Reader):
     def cache(self):
         """
         Get the cache.
-        @return: The I{options} when I{cachingpolicy} = B{0}.
+        @return: The I{cache} when I{cachingpolicy} = B{0}.
         @rtype: L{Cache}
         """
         if self.options.cachingpolicy == 0:
             return self.options.cache
-        else:
-            return NoCache()
+        return NoCache()
 
 
 class DefinitionsReader(Reader):
     """
-    The WSDL definitions reader provides an integration
-    between the Definitions and the object cache.
+    Provides integration between the WSDL Definitions object and the object
+    cache.
     @ivar fn: A factory function (constructor) used to
         create the object not found in the cache.
     @type fn: I{Constructor}
@@ -125,8 +127,8 @@ class DefinitionsReader(Reader):
         """
         @param options: An options object.
         @type options: I{Options}
-        @param fn: A factory function (constructor) used to
-            create the object not found in the cache.
+        @param fn: A factory function (constructor) used to create the object
+            not found in the cache.
         @type fn: I{Constructor}
         """
         Reader.__init__(self, options)
@@ -160,10 +162,9 @@ class DefinitionsReader(Reader):
     def cache(self):
         """
         Get the cache.
-        @return: The I{options} when I{cachingpolicy} = B{1}.
+        @return: The I{cache} when I{cachingpolicy} = B{1}.
         @rtype: L{Cache}
         """
         if self.options.cachingpolicy == 1:
             return self.options.cache
-        else:
-            return NoCache()
+        return NoCache()

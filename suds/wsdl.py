@@ -211,7 +211,7 @@ class Definitions(WObject):
             for root in t.contents():
                 schema = Schema(root, self.url, self.options, container)
                 container.add(schema)
-        if not len(container): # empty
+        if not len(container):
             root = Element.buildPath(self.root, 'types/schema')
             schema = Schema(root, self.url, self.options, container)
             container.add(schema)
@@ -251,6 +251,8 @@ class Definitions(WObject):
             for op in b.operations.values():
                 for body in (op.soap.input.body, op.soap.output.body):
                     body.wrapped = False
+                    if not self.options.unwrap:
+                        continue
                     if len(body.parts) != 1:
                         continue
                     for p in body.parts:
@@ -792,10 +794,7 @@ class Port(NamedObject):
         self.__service = service
         self.binding = root.get('binding')
         address = root.getChild('address')
-        if address is None:
-            self.location = None
-        else:
-            self.location = address.get('location').encode('utf-8')
+        self.location = address is not None and address.get('location')
         self.methods = {}
 
     def method(self, name):

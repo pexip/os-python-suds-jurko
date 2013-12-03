@@ -1,3 +1,9 @@
+python-suds-jurko (0.4.1.jurko.6.ef33763-1) precise; urgency=low
+
+  * Imported Upstream version 0.4.1.jurko.6.ef33763
+
+ -- Colin Bradbury <colin@pexip.com>  Tue, 03 Dec 2013 18:05:04 +0000
+
 python-suds-jurko (0.4.1jurko4-1) precise; urgency=low
 
   * Initial release

@@ -1,0 +1,21 @@
+diff --git a/suds/bindings/binding.py b/suds/bindings/binding.py
+index 2d5829f..37c936e 100644
+--- a/suds/bindings/binding.py
++++ b/suds/bindings/binding.py
+@@ -58,7 +58,6 @@ class Binding:
+         @type wsdl: L{wsdl.Definitions}
+         """
+         self.wsdl = wsdl
+-        self.multiref = MultiRef()
+ 
+     def schema(self):
+         return self.wsdl.schema
+@@ -136,7 +135,7 @@ class Binding:
+         soapenv = replyroot.getChild('Envelope', envns)
+         soapenv.promotePrefixes()
+         soapbody = soapenv.getChild('Body', envns)
+-        soapbody = self.multiref.process(soapbody)
++        soapbody = MultiRef().process(soapbody)
+         nodes = self.replycontent(method, soapbody)
+         rtypes = self.returned_types(method)
+         if len(rtypes) > 1:

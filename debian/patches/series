@@ -1,1 +1,2 @@
 01-reinstate-global-namespace.patch
+02-make-thread-safe.patch

@@ -1,0 +1,10 @@
+diff --git a/suds/__init__.py b/suds/__init__.py
+index ceb8e11..f4e1f20 100644
+--- a/suds/__init__.py
++++ b/suds/__init__.py
+@@ -190,3 +190,5 @@ if sys.version_info >= (3, 0):
+     byte_str_class = bytes
+ else:
+     byte_str_class = str
++
++import client

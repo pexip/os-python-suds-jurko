@@ -1,3 +1,9 @@
+python-suds-jurko (1:0.4.1.jurko.6~git20131130-2) pexip; urgency=low
+
+  * Add patch to fix thread safety issue
+
+ -- Colin Bradbury <colin@pexip.com>  Mon, 13 Jan 2014 15:56:04 +0000
+
 python-suds-jurko (1:0.4.1.jurko.6~git20131130-1) pexip; urgency=low
 
   * Reimport previous release with new epoch to correct versioning mess.

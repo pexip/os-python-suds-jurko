@@ -19,8 +19,10 @@ The I{builder} module provides an wsdl/xsd defined types factory
 """
 
 from logging import getLogger
+
 from suds import *
 from suds.sudsobject import Factory
+
 
 log = getLogger(__name__)
 
@@ -38,38 +40,38 @@ class Builder:
     def build(self, name):
         """ build a an object for the specified typename as defined in the schema """
         if isinstance(name, basestring):
-            type = self.resolver.find(name)
-            if type is None:
+            the_type = self.resolver.find(name)
+            if the_type is None:
                 raise TypeNotFound(name)
         else:
-            type = name
-        cls = type.name
-        if type.mixed():
+            the_type = name
+        cls = the_type.name
+        if the_type.mixed():
             data = Factory.property(cls)
         else:
             data = Factory.object(cls)
-        resolved = type.resolve()
+        resolved = the_type.resolve()
         md = data.__metadata__
         md.sxtype = resolved
         md.ordering = self.ordering(resolved)
         history = []
         self.add_attributes(data, resolved)
-        for child, ancestry in type.children():
+        for child, ancestry in the_type.children():
             if self.skip_child(child, ancestry):
                 continue
             self.process(data, child, history[:])
         return data
 
-    def process(self, data, type, history):
+    def process(self, data, the_type, history):
         """ process the specified type then process its children """
-        if type in history:
+        if the_type in history:
             return
-        if type.enum():
+        if the_type.enum():
             return
-        history.append(type)
-        resolved = type.resolve()
+        history.append(the_type)
+        resolved = the_type.resolve()
         value = None
-        if type.multi_occurrence():
+        if the_type.multi_occurrence():
             value = []
         else:
             if len(resolved) > 0:
@@ -82,7 +84,7 @@ class Builder:
                     md = value.__metadata__
                     md.sxtype = resolved
                     md.ordering = self.ordering(resolved)
-        setattr(data, type.name, value)
+        setattr(data, the_type.name, value)
         if value is not None:
             data = value
         if not isinstance(data, list):
@@ -92,9 +94,9 @@ class Builder:
                     continue
                 self.process(data, child, history[:])
 
-    def add_attributes(self, data, type):
+    def add_attributes(self, data, the_type):
         """ add required attributes """
-        for attr, ancestry in type.attributes():
+        for attr, ancestry in the_type.attributes():
             name = '_%s' % attr.name
             value = attr.get_default()
             setattr(data, name, value)
@@ -107,10 +109,10 @@ class Builder:
                 return True
         return False
 
-    def ordering(self, type):
+    def ordering(self, the_type):
         """ get the ordering """
         result = []
-        for child, ancestry in type.resolve():
+        for child, ancestry in the_type.resolve():
             name = child.name
             if child.name is None:
                 continue

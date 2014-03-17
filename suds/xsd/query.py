@@ -18,12 +18,13 @@
 The I{query} module defines a class for performing schema queries.
 """
 
+from logging import getLogger
+
 from suds import *
 from suds.sudsobject import *
 from suds.xsd import qualify, isqref
 from suds.xsd.sxbuiltin import Factory
 
-from logging import getLogger
 
 log = getLogger(__name__)
 

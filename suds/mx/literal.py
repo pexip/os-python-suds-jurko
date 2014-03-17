@@ -18,6 +18,8 @@
 Provides literal I{marshaller} classes.
 """
 
+from logging import getLogger
+
 from suds import *
 from suds.mx import *
 from suds.mx.core import Core
@@ -26,7 +28,6 @@ from suds.resolver import GraphResolver, Frame
 from suds.sax.element import Element
 from suds.sudsobject import Factory
 
-from logging import getLogger
 
 log = getLogger(__name__)
 

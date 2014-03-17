@@ -52,11 +52,7 @@ class Request:
         self.message = message
 
     def __str__(self):
-        s = []
-        s.append('URL:%s' % self.url)
-        s.append('HEADERS: %s' % self.headers)
-        s.append('MESSAGE:')
-        s.append(str(self.message))
+        s = ['URL:%s' % self.url, 'HEADERS: %s' % self.headers, 'MESSAGE:', str(self.message)]
         return '\n'.join(s)
 
 
@@ -85,11 +81,7 @@ class Reply:
         self.message = message
 
     def __str__(self):
-        s = []
-        s.append('CODE: %s' % self.code)
-        s.append('HEADERS: %s' % self.headers)
-        s.append('MESSAGE:')
-        s.append(str(self.message))
+        s = ['CODE: %s' % self.code, 'HEADERS: %s' % self.headers, 'MESSAGE:', str(self.message)]
         return '\n'.join(s)
 
 

@@ -19,10 +19,12 @@ The I{sxbase} module provides I{base} classes representing schema objects.
 """
 
 from logging import getLogger
+
 from suds import *
 from suds.xsd import *
 from suds.sax.element import Element
 from suds.sax import Namespace
+
 
 log = getLogger(__name__)
 
@@ -436,8 +438,7 @@ class SchemaObject(UnicodeMixin):
             return '%s ...' % Repr(self)
         history.append(self)
         tab = '%*s'%(indent*3, '')
-        result  = []
-        result.append('%s<%s' % (tab, self.id))
+        result  = ['%s<%s' % (tab, self.id)]
         for n in self.description():
             if not hasattr(self, n):
                 continue
@@ -470,8 +471,7 @@ class SchemaObject(UnicodeMixin):
         return unicode(self.str())
 
     def __repr__(self):
-        s = []
-        s.append('<%s' % self.id)
+        s = ['<%s' % self.id]
         for n in self.description():
             if not hasattr(self, n):
                 continue
@@ -484,7 +484,8 @@ class SchemaObject(UnicodeMixin):
 
     def __len__(self):
         n = 0
-        for x in self: n += 1
+        for x in self:
+            n += 1
         return n
 
     def __iter__(self):

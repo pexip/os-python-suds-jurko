@@ -18,17 +18,18 @@
 Contains classes for basic HTTP transport implementations.
 """
 
-from suds.transport import *
-from suds.properties import Unskin
 from urlparse import urlparse
 from cookielib import CookieJar
 from logging import getLogger
-
 import base64
 import httplib
 import socket
 import sys
 import urllib2
+
+from suds.transport import *
+from suds.properties import Unskin
+
 
 log = getLogger(__name__)
 
@@ -67,7 +68,6 @@ class HttpTransport(Transport):
             raise TransportError(str(e), e.code, e.fp)
 
     def send(self, request):
-        result = None
         url = self.__get_request_url(request)
         msg = request.message
         headers = request.headers
@@ -139,8 +139,7 @@ class HttpTransport(Transport):
         @return: A list of handlers to be installed in the opener.
         @rtype: [Handler,...]
         """
-        handlers = []
-        handlers.append(urllib2.ProxyHandler(self.proxy))
+        handlers = [urllib2.ProxyHandler(self.proxy)]
         return handlers
 
     def u2ver(self):
@@ -156,7 +155,9 @@ class HttpTransport(Transport):
             log.exception(e)
             return 0
 
-    def __deepcopy__(self, memo={}):
+    def __deepcopy__(self, memo=None):
+        if not memo:
+            memo = {}
         clone = self.__class__()
         p = Unskin(self.options)
         cp = Unskin(clone.options)
@@ -210,7 +211,7 @@ class HttpAuthenticated(HttpTransport):
         if not (None in credentials):
             credentials = ':'.join(credentials)
             # Bytes and strings are different in Python 3 than in Python 2.x.
-            if sys.version_info < (3,0):
+            if sys.version_info < (3, 0):
                 basic = 'Basic %s' % base64.b64encode(credentials)
             else:
                 encodedBytes = base64.urlsafe_b64encode(credentials.encode())
@@ -219,4 +220,4 @@ class HttpAuthenticated(HttpTransport):
             request.headers['Authorization'] = basic
 
     def credentials(self):
-        return (self.options.username, self.options.password)
+        return self.options.username, self.options.password

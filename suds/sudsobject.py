@@ -21,7 +21,9 @@ wsdl/xsd defined types.
 """
 
 from logging import getLogger
+
 from suds import *
+
 
 log = getLogger(__name__)
 
@@ -50,6 +52,7 @@ def asdict(sobject):
     """
     return dict(items(sobject))
 
+
 def merge(a, b):
     """
     Merge all attributes and metadata from I{a} to I{b}.
@@ -62,6 +65,7 @@ def merge(a, b):
         setattr(b, item[0], item[1])
         b.__metadata__ = b.__metadata__
     return b
+
 
 def footprint(sobject):
     """
@@ -82,16 +86,16 @@ def footprint(sobject):
         if hasattr(v, '__len__'):
             if len(v): n += 1
             continue
-        n +=1
+        n += 1
     return n
 
 
 class Factory:
-
     cache = {}
 
     @classmethod
-    def subclass(cls, name, bases, dict={}):
+    def subclass(cls, name, bases, dict=None):
+        if not dict: dict = {}
         if not isinstance(bases, tuple):
             bases = (bases,)
         # name is type unicode in python 2 -> not accepted by the type()
@@ -125,7 +129,6 @@ class Factory:
 
 
 class Object(UnicodeMixin):
-
     def __init__(self):
         self.__keylist__ = []
         self.__printer__ = Printer()
@@ -134,7 +137,7 @@ class Object(UnicodeMixin):
     def __setattr__(self, name, value):
         builtin = name.startswith('__') and name.endswith('__')
         if not builtin and \
-            name not in self.__keylist__:
+                        name not in self.__keylist__:
             self.__keylist__.append(name)
         self.__dict__[name] = value
 
@@ -146,7 +149,7 @@ class Object(UnicodeMixin):
                 self.__keylist__.remove(name)
         except:
             cls = self.__class__.__name__
-            raise AttributeError, "%s has no attribute '%s'" % (cls, name)
+            raise AttributeError("%s has no attribute '%s'" % (cls, name))
 
     def __getitem__(self, name):
         if isinstance(name, int):
@@ -173,7 +176,6 @@ class Object(UnicodeMixin):
 
 
 class Iter:
-
     def __init__(self, sobject):
         self.sobject = sobject
         self.keylist = self.__keylist(sobject)
@@ -224,7 +226,6 @@ class Facade(Object):
 
 
 class Property(Object):
-
     def __init__(self, value):
         Object.__init__(self)
         self.value = value
@@ -248,7 +249,8 @@ class Printer:
     """
 
     @classmethod
-    def indent(cls, n): return '%*s'%(n*3,' ')
+    def indent(cls, n):
+        return '%*s' % (n * 3, ' ')
 
     def tostr(self, object, indent=-2):
         """ get s string representation of object """
@@ -262,15 +264,15 @@ class Printer:
         if isinstance(object, Object):
             if len(object) == 0:
                 return '<empty>'
-            return self.print_object(object, h, n+2, nl)
+            return self.print_object(object, h, n + 2, nl)
         if isinstance(object, dict):
             if len(object) == 0:
                 return '<empty>'
-            return self.print_dictionary(object, h, n+2, nl)
-        if isinstance(object, (list,tuple)):
+            return self.print_dictionary(object, h, n + 2, nl)
+        if isinstance(object, (list, tuple)):
             if len(object) == 0:
                 return '<empty>'
-            return self.print_collection(object, h, n+2)
+            return self.print_collection(object, h, n + 2)
         if isinstance(object, basestring):
             return '"%s"' % tostr(object)
         return '%s' % tostr(object)
@@ -302,8 +304,8 @@ class Printer:
                 continue
             item = self.unwrap(d, item)
             s.append('\n')
-            s.append(self.indent(n+1))
-            if isinstance(item[1], (list,tuple)):
+            s.append(self.indent(n + 1))
+            if isinstance(item[1], (list, tuple)):
                 s.append(item[0])
                 s.append('[]')
             else:
@@ -327,8 +329,8 @@ class Printer:
         s.append('{')
         for item in d.items():
             s.append('\n')
-            s.append(self.indent(n+1))
-            if isinstance(item[1], (list,tuple)):
+            s.append(self.indent(n + 1))
+            if isinstance(item[1], (list, tuple)):
                 s.append(tostr(item[0]))
                 s.append('[]')
             else:
@@ -349,7 +351,7 @@ class Printer:
         for item in c:
             s.append('\n')
             s.append(self.indent(n))
-            s.append(self.process(item, h, n-2))
+            s.append(self.process(item, h, n - 2))
             s.append(',')
         h.pop()
         return ''.join(s)
@@ -364,7 +366,7 @@ class Printer:
                 return item
             wrappers = getattr(pmd, 'wrappers', {})
             fn = wrappers.get(item[0], nopt)
-            return (item[0], fn(item[1]))
+            return item[0], fn(item[1])
         except:
             pass
         return item

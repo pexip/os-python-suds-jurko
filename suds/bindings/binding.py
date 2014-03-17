@@ -18,6 +18,9 @@
 Provides classes for (WS) SOAP bindings.
 """
 
+from copy import deepcopy
+from logging import getLogger
+
 from suds import *
 from suds.sax import Namespace
 from suds.sax.document import Document
@@ -32,8 +35,6 @@ from suds.xsd.sxbasic import Element as SchemaElement
 from suds.options import Options
 from suds.plugin import PluginContainer
 
-from copy import deepcopy
-from logging import getLogger
 
 log = getLogger(__name__)
 
@@ -204,7 +205,7 @@ class Binding:
                     setattr(composite, tag, sobject)
             else:
                 if not isinstance(value, list):
-                    value = [value,]
+                    value = [value, ]
                     setattr(composite, tag, value)
                 value.append(sobject)
         return composite
@@ -224,7 +225,7 @@ class Binding:
         """
         marshaller = self.marshaller()
         content = Content(tag=pdef[0], value=object, type=pdef[1],
-            real=pdef[1].resolve())
+                          real=pdef[1].resolve())
         return marshaller.process(content)
 
     def mkheader(self, method, hdef, object):
@@ -305,12 +306,12 @@ class Binding:
         if wsse is not None:
             content.append(wsse.xml())
         headers = self.options().soapheaders
-        if not isinstance(headers, (tuple,list,dict)):
+        if not isinstance(headers, (tuple, list, dict)):
             headers = (headers,)
         if len(headers) == 0:
             return content
         pts = self.headpart_types(method)
-        if isinstance(headers, (tuple,list)):
+        if isinstance(headers, (tuple, list)):
             for header in headers:
                 if isinstance(header, Element):
                     content.append(deepcopy(header))

@@ -36,17 +36,21 @@ class MethodNotFound(Exception):
     def __init__(self, name):
         Exception.__init__(self, u"Method not found: '%s'" % name)
 
+
 class PortNotFound(Exception):
     def __init__(self, name):
         Exception.__init__(self, u"Port not found: '%s'" % name)
+
 
 class ServiceNotFound(Exception):
     def __init__(self, name):
         Exception.__init__(self, u"Service not found: '%s'" % name)
 
+
 class TypeNotFound(Exception):
     def __init__(self, name):
         Exception.__init__(self, u"Type not found: '%s'" % tostr(name))
+
 
 class BuildError(Exception):
     msg = """
@@ -56,8 +60,10 @@ class BuildError(Exception):
         ticket with a description of this error.
         Reason: %s
         """
+
     def __init__(self, name, exception):
         Exception.__init__(self, BuildError.msg % (name, exception))
+
 
 class SoapHeadersNotPermitted(Exception):
     msg = """
@@ -65,14 +71,16 @@ class SoapHeadersNotPermitted(Exception):
         SOAP headers for this method. Retry without the soapheaders keyword
         argument.
         """
+
     def __init__(self, name):
         Exception.__init__(self, self.msg % name)
+
 
 class WebFault(Exception):
     def __init__(self, fault, document):
         if hasattr(fault, 'faultstring'):
             Exception.__init__(self, u"Server raised fault: '%s'" %
-                fault.faultstring)
+                                     fault.faultstring)
         self.fault = fault
         self.document = document
 
@@ -84,6 +92,7 @@ class WebFault(Exception):
 class Repr:
     def __init__(self, x):
         self.x = x
+
     def __str__(self):
         return repr(self.x)
 
@@ -99,19 +108,21 @@ class null:
     """
     pass
 
+
 def objid(obj):
     return obj.__class__.__name__ + ':' + hex(id(obj))
 
-def tostr(object, encoding=None):
+
+def tostr(obj, encoding=None):
     """ get a unicode safe string representation of an object """
-    if isinstance(object, basestring):
+    if isinstance(obj, basestring):
         if encoding is None:
-            return object
+            return obj
         else:
-            return object.encode(encoding)
-    if isinstance(object, tuple):
+            return obj.encode(encoding)
+    if isinstance(obj, tuple):
         s = ['(']
-        for item in object:
+        for item in obj:
             if isinstance(item, basestring):
                 s.append(item)
             else:
@@ -119,9 +130,9 @@ def tostr(object, encoding=None):
             s.append(', ')
         s.append(')')
         return ''.join(s)
-    if isinstance(object, list):
+    if isinstance(obj, list):
         s = ['[']
-        for item in object:
+        for item in obj:
             if isinstance(item, basestring):
                 s.append(item)
             else:
@@ -129,9 +140,9 @@ def tostr(object, encoding=None):
             s.append(', ')
         s.append(']')
         return ''.join(s)
-    if isinstance(object, dict):
+    if isinstance(obj, dict):
         s = ['{']
-        for item in object.items():
+        for item in obj.items():
             if isinstance(item[0], basestring):
                 s.append(item[0])
             else:
@@ -145,9 +156,9 @@ def tostr(object, encoding=None):
         s.append('}')
         return ''.join(s)
     try:
-        return unicode(object)
+        return unicode(obj)
     except:
-        return str(object)
+        return str(obj)
 
 
 #
@@ -159,6 +170,7 @@ if sys.version_info < (3, 0):
 else:
     from io import BytesIO
 
+
 # Idea from 'http://lucumr.pocoo.org/2011/1/22/forwards-compatible-python'.
 class UnicodeMixin(object):
     if sys.version_info >= (3, 0):
@@ -166,6 +178,7 @@ class UnicodeMixin(object):
         __str__ = lambda x: x.__unicode__()
     else:
         __str__ = lambda x: unicode(x).encode('utf-8')
+
 
 #   Used instead of byte literals because they are not supported on Python
 # versions prior to 2.6.

@@ -19,8 +19,9 @@ The I{soaparray} module provides XSD extensions for handling
 soap (section 5) encoded arrays.
 """
 
-from suds import *
 from logging import getLogger
+
+from suds import *
 from suds.xsd.sxbasic import Factory as SXFactory
 from suds.xsd.sxbasic import Attribute as SXAttribute
 
@@ -51,8 +52,9 @@ class Attribute(SXAttribute):
 
     def description(self):
         d = SXAttribute.description(self)
-        d = d+('aty',)
+        d = d + ('aty',)
         return d
+
 
 #
 # Builder function, only builds Attribute when arrayType

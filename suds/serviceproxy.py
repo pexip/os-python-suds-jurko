@@ -21,8 +21,10 @@ Replaced by: L{client.Client}
 """
 
 from logging import getLogger
+
 from suds import *
 from suds.client import Client
+
 
 log = getLogger(__name__)
 

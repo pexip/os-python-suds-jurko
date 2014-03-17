@@ -21,8 +21,10 @@ document content to be distributed alongside the suds library.
 
 """
 
-import suds
 from logging import getLogger
+
+import suds
+
 
 log = getLogger(__name__)
 
@@ -542,7 +544,7 @@ class DocumentStore:
 
     def __init__(self, *args, **kwargs):
         self.__store = {
-            'schemas.xmlsoap.org/soap/encoding/':soap5_encoding_schema}
+            'schemas.xmlsoap.org/soap/encoding/': soap5_encoding_schema}
         self.update = self.__store.update
         self.update(*args, **kwargs)
 

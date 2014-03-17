@@ -21,13 +21,15 @@ designed for collecting and reporting performance metrics.
 
 import time
 from logging import getLogger
-from suds import *
 from math import modf
+
+from suds import *
+
 
 log = getLogger(__name__)
 
-class Timer:
 
+class Timer:
     def __init__(self):
         self.started = 0
         self.stopped = 0
@@ -43,7 +45,7 @@ class Timer:
         return self
 
     def duration(self):
-        return ( self.stopped - self.started )
+        return self.stopped - self.started
 
     def __str__(self):
         if self.started == 0:
@@ -51,12 +53,12 @@ class Timer:
         if self.started > 0 and self.stopped == 0:
             return 'started: %d (running)' % self.started
         duration = self.duration()
-        jmod = ( lambda m : (m[1], m[0]*1000) )
+        jmod = ( lambda m: (m[1], m[0] * 1000) )
         if duration < 1:
-            ms = (duration*1000)
+            ms = (duration * 1000)
             return '%d (ms)' % ms
         if duration < 60:
             m = modf(duration)
             return '%d.%.3d (seconds)' % jmod(m)
-        m = modf(duration/60)
+        m = modf(duration / 60)
         return '%d.%.3d (minutes)' % jmod(m)

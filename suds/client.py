@@ -19,6 +19,12 @@ The I{2nd generation} service proxy provides access to web services.
 See I{README.txt}
 """
 
+from cookielib import CookieJar
+from copy import deepcopy
+import httplib
+from logging import getLogger
+from urlparse import urlparse
+
 import suds
 from suds import *
 import suds.bindings.binding
@@ -37,13 +43,9 @@ from suds.transport import TransportError, Request
 from suds.transport.https import HttpAuthenticated
 from suds.umx.basic import Basic as UmxBasic
 from suds.wsdl import Definitions
+
 import sudsobject
 
-from cookielib import CookieJar
-from copy import deepcopy
-import httplib
-from logging import getLogger
-from urlparse import urlparse
 
 log = getLogger(__name__)
 
@@ -63,6 +65,7 @@ class Client(UnicodeMixin):
     @ivar messages: The last sent/received messages.
     @type messages: str[2]
     """
+
     @classmethod
     def items(cls, sobject):
         """
@@ -158,9 +161,11 @@ class Client(UnicodeMixin):
         @return: A shallow clone.
         @rtype: L{Client}
         """
+
         class Uninitialized(Client):
             def __init__(self):
                 pass
+
         clone = Uninitialized()
         clone.options = Options()
         cp = Unskin(clone.options)
@@ -174,10 +179,8 @@ class Client(UnicodeMixin):
         return clone
 
     def __unicode__(self):
-        s = ['\n']
-        s.append('Suds ( https://fedorahosted.org/suds/ )')
-        s.append('  version: %s' % suds.__version__)
-        if ( suds.__build__ ):
+        s = ['\n', 'Suds ( https://fedorahosted.org/suds/ )', '  version: %s' % suds.__version__]
+        if suds.__build__:
             s.append('  build: %s' % suds.__build__)
         for sd in self.sd:
             s.append('\n\n%s' % unicode(sd))
@@ -254,6 +257,7 @@ class ServiceSelector:
     @ivar __services: A list of I{wsdl} services.
     @type __services: list
     """
+
     def __init__(self, client, services):
         """
         @param client: A suds client.
@@ -355,6 +359,7 @@ class PortSelector:
     @ivar __qn: The I{qualified} name of the port (used for logging).
     @type __qn: str
     """
+
     def __init__(self, client, ports, qn):
         """
         @param client: A suds client.
@@ -453,6 +458,7 @@ class MethodSelector:
     @ivar __qn: The I{qualified} name of the method (used for logging).
     @type __qn: str
     """
+
     def __init__(self, client, methods, qn):
         """
         @param client: A suds client.
@@ -521,7 +527,7 @@ class Method:
         except WebFault, e:
             if self.faults():
                 raise
-            return (httplib.INTERNAL_SERVER_ERROR, e)
+            return httplib.INTERNAL_SERVER_ERROR, e
 
     def faults(self):
         """ get faults option """
@@ -575,7 +581,7 @@ class SoapClient:
         soapenv = binding.get_message(self.method, args, kwargs)
         timer.stop()
         metrics.log.debug("message for '%s' created: %s", self.method.name,
-            timer)
+                          timer)
         timer.start()
         result = self.send(soapenv)
         timer.stop()
@@ -615,12 +621,12 @@ class SoapClient:
         except TransportError, e:
             content = e.fp and e.fp.read() or ''
             return self.process_reply(reply=content, status=e.httpcode,
-                description=tostr(e), original_soapenv=original_soapenv)
+                                      description=tostr(e), original_soapenv=original_soapenv)
         return self.process_reply(reply=reply.message,
-            original_soapenv=original_soapenv)
+                                  original_soapenv=original_soapenv)
 
     def process_reply(self, reply, status=None, description=None,
-        original_soapenv=None):
+                      original_soapenv=None):
         if status is None:
             status = httplib.OK
         if status in (httplib.ACCEPTED, httplib.NO_CONTENT):
@@ -631,7 +637,7 @@ class SoapClient:
                 log.debug('HTTP succeeded:\n%s', reply)
             else:
                 log.debug('HTTP failed - %d - %s:\n%s', status, description,
-                    reply)
+                          reply)
 
             # (todo)
             #   Consider whether and how to allow plugins to handle error,
@@ -663,8 +669,8 @@ class SoapClient:
                 if fault:
                     if status != httplib.INTERNAL_SERVER_ERROR:
                         log.warn("Web service reported a SOAP processing "
-                            "fault using an unexpected HTTP status code %d. "
-                            "Reporting as an internal server error.", status)
+                                 "fault using an unexpected HTTP status code %d. "
+                                 "Reporting as an internal server error.", status)
                     if self.options.faults:
                         raise WebFault(fault, replyroot)
                     return (httplib.INTERNAL_SERVER_ERROR, fault)
@@ -687,7 +693,7 @@ class SoapClient:
             failed = False
             if self.options.faults:
                 return result
-            return (httplib.OK, result)
+            return httplib.OK, result
         finally:
             if failed and original_soapenv:
                 log.error(original_soapenv)
@@ -718,7 +724,7 @@ class SoapClient:
         action = self.method.soap.action
         if isinstance(action, unicode):
             action = action.encode('utf-8')
-        stock = {'Content-Type':'text/xml; charset=utf-8', 'SOAPAction':action}
+        stock = {'Content-Type': 'text/xml; charset=utf-8', 'SOAPAction': action}
         result = dict(stock, **self.options.headers)
         log.debug('headers = %s', result)
         return result
@@ -764,12 +770,12 @@ class SimClient(SoapClient):
         if reply is not None:
             assert reply.__class__ is suds.byte_str_class
             status = simulation.get('status')
-            description=simulation.get('description')
+            description = simulation.get('description')
             if description is None:
                 description = 'injected reply'
             return self.process_reply(reply=reply, status=status,
-                description=description, original_soapenv=msg)
-        raise Exception('reply or msg injection parameter expected');
+                                      description=description, original_soapenv=msg)
+        raise Exception('reply or msg injection parameter expected')
 
 
 class RequestContext:
@@ -815,7 +821,7 @@ class RequestContext:
         @rtype: I{builtin}|I{subclass of} L{Object}
         """
         return self.client.process_reply(reply=reply, status=status,
-            description=description, original_soapenv=self.original_envelope)
+                                         description=description, original_soapenv=self.original_envelope)
 
 
 def _parse(string):

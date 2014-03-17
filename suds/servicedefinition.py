@@ -19,11 +19,14 @@ The I{service definition} provides a textual representation of a service.
 """
 
 from logging import getLogger
+
 from suds import *
 import suds.metrics as metrics
 from suds.sax import Namespace
 
+
 log = getLogger(__name__)
+
 
 class ServiceDefinition(UnicodeMixin):
     """
@@ -107,7 +110,7 @@ class ServiceDefinition(UnicodeMixin):
         """Add prefixes for each namespace referenced by parameter types."""
         namespaces = []
         for l in (self.params, self.types):
-            for t,r in l:
+            for t, r in l:
                 ns = r.namespace()
                 if ns[1] is None: continue
                 if ns[1] in namespaces: continue
@@ -119,7 +122,6 @@ class ServiceDefinition(UnicodeMixin):
                 if ns[1] is None: continue
                 if ns[1] in namespaces: continue
                 namespaces.append(ns[1])
-        i = 0
         namespaces.sort()
         for u in namespaces:
             p = self.nextprefix()
@@ -152,8 +154,8 @@ class ServiceDefinition(UnicodeMixin):
         """
         used = [ns[0] for ns in self.prefixes]
         used += [ns[0] for ns in self.wsdl.root.nsprefixes.items()]
-        for n in range(0,1024):
-            p = 'ns%d'%n
+        for n in range(0, 1024):
+            p = 'ns%d' % n
             if p not in used:
                 return p
         raise Exception('prefixes exhausted')
@@ -170,7 +172,7 @@ class ServiceDefinition(UnicodeMixin):
             if u == ns[1]: return ns[0]
         for ns in self.prefixes:
             if u == ns[1]: return ns[0]
-        raise Exception('ns (%s) not mapped'  % u)
+        raise Exception('ns (%s) not mapped' % u)
 
     def xlate(self, type):
         """
@@ -197,7 +199,7 @@ class ServiceDefinition(UnicodeMixin):
         @rtype: str
         """
         s = []
-        indent = (lambda n :  '\n%*s'%(n*3,' '))
+        indent = (lambda n: '\n%*s' % (n * 3, ' '))
         s.append('Service ( %s ) tns="%s"' % (self.service.name, self.wsdl.tns[1]))
         s.append(indent(1))
         s.append('Prefixes (%d)' % len(self.prefixes))
@@ -217,7 +219,7 @@ class ServiceDefinition(UnicodeMixin):
                 sig.append(m[0])
                 sig.append('(')
                 sig.append(', '.join("%s %s" % (self.xlate(p[1]), p[0]) for p
-                    in m[1]))
+                                     in m[1]))
                 sig.append(')')
                 try:
                     s.append(''.join(sig))

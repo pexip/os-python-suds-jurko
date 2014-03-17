@@ -19,10 +19,12 @@ Provides sx typing classes.
 """
 
 from logging import getLogger
+
 from suds import *
 from suds.mx import *
 from suds.sax import Namespace as NS
 from suds.sax.text import Text
+
 
 log = getLogger(__name__)
 
@@ -35,14 +37,14 @@ class Typer:
     """
 
     types = {
-        int : ('int', NS.xsdns),
-        long : ('long', NS.xsdns),
-        float : ('float', NS.xsdns),
-        str : ('string', NS.xsdns),
-        unicode : ('string', NS.xsdns),
-        Text : ('string', NS.xsdns),
-        bool : ('boolean', NS.xsdns),
-     }
+        int: ('int', NS.xsdns),
+        long: ('long', NS.xsdns),
+        float: ('float', NS.xsdns),
+        str: ('string', NS.xsdns),
+        unicode: ('string', NS.xsdns),
+        Text: ('string', NS.xsdns),
+        bool: ('boolean', NS.xsdns),
+    }
 
     @classmethod
     def auto(cls, node, value=None):

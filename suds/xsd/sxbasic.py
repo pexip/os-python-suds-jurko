@@ -20,6 +20,8 @@ I{basic} schema objects.
 """
 
 from logging import getLogger
+from urlparse import urljoin
+
 from suds import *
 from suds.xsd import *
 from suds.xsd.sxbase import *
@@ -27,7 +29,6 @@ from suds.xsd.query import *
 from suds.sax import Namespace
 from suds.transport import TransportError
 from suds.reader import DocumentReader
-from urlparse import urljoin
 
 
 log = getLogger(__name__)
@@ -223,7 +224,7 @@ class Simple(SchemaObject):
         return len(self)
 
     def description(self):
-        return ('name',)
+        return 'name',
 
     def extension(self):
         for c in self.rawchildren:
@@ -247,7 +248,7 @@ class List(SchemaObject):
         return ()
 
     def description(self):
-        return ('name',)
+        return 'name',
 
     def xslist(self):
         return True

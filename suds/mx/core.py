@@ -19,6 +19,7 @@ Provides I{marshaller} core classes.
 """
 
 from logging import getLogger
+
 from suds import *
 from suds.mx import *
 from suds.mx.appender import ContentAppender
@@ -79,7 +80,8 @@ class Core:
         """
         pass
 
-    def node(self, content):
+    @staticmethod
+    def node(content):
         """
         Create and return an XML node.
         @param content: The content for which proccessing has been suspended.

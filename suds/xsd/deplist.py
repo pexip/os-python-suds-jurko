@@ -19,7 +19,9 @@ The I{depsolve} module defines a class for performing dependency solving.
 """
 
 from logging import getLogger
+
 from suds import *
+
 
 log = getLogger(__name__)
 
@@ -130,10 +132,10 @@ class DepList:
 if __name__ == '__main__':
     a = ('a', ('x',))
     b = ('b', ('a',))
-    c = ('c', ('a','b'))
+    c = ('c', ('a', 'b'))
     d = ('d', ('c',))
-    e = ('e', ('d','a'))
-    f = ('f', ('e','c','d','a'))
+    e = ('e', ('d', 'a'))
+    f = ('f', ('e', 'c', 'd', 'a'))
     x = ('x', ())
     L = DepList()
     L.add(c, e, d, b, f, a, x)

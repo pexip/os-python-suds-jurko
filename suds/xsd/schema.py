@@ -22,6 +22,7 @@ Most of the I{value-add} provided by the model is centered around
 transparent referenced type resolution and targeted denormalization.
 """
 
+from logging import getLogger
 
 import suds.metrics
 from suds import *
@@ -33,7 +34,7 @@ from suds.xsd.sxbase import SchemaObject
 from suds.xsd.deplist import DepList
 from suds.sax.element import Element
 from suds.sax import splitPrefix, Namespace
-from logging import getLogger
+
 
 log = getLogger(__name__)
 
@@ -354,7 +355,7 @@ class Schema(UnicodeMixin):
         if ref is None:
             return True
         else:
-            return ( not self.builtin(ref, context) )
+            return not self.builtin(ref, context)
 
     def builtin(self, ref, context=None):
         """
@@ -368,12 +369,12 @@ class Schema(UnicodeMixin):
         try:
             if isqref(ref):
                 ns = ref[1]
-                return ( ref[0] in Factory.tags and ns.startswith(w3) )
+                return ref[0] in Factory.tags and ns.startswith(w3)
             if context is None:
                 context = self.root
             prefix = splitPrefix(ref)[0]
             prefixes = context.findPrefixes(w3, 'startswith')
-            return ( prefix in prefixes and ref[0] in Factory.tags )
+            return prefix in prefixes and ref[0] in Factory.tags
         except:
             return False
 
@@ -395,11 +396,7 @@ class Schema(UnicodeMixin):
 
     def str(self, indent=0):
         tab = '%*s'%(indent*3, '')
-        result = []
-        result.append('%s%s' % (tab, self.id))
-        result.append('%s(raw)' % tab)
-        result.append(self.root.str(indent+1))
-        result.append('%s(model)' % tab)
+        result = ['%s%s' % (tab, self.id), '%s(raw)' % tab, self.root.str(indent + 1), '%s(model)' % tab]
         for c in self.children:
             result.append(c.str(indent+1))
         result.append('')

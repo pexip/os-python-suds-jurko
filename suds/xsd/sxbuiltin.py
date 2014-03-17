@@ -19,13 +19,14 @@ The I{sxbuiltin} module provides classes that represent
 XSD I{builtin} schema objects.
 """
 
+import datetime as dt
+from logging import getLogger
+
 from suds import *
 from suds.xsd import *
 from suds.sax.date import *
 from suds.xsd.sxbase import XBuiltin
 
-import datetime as dt
-from logging import getLogger
 
 log = getLogger(__name__)
 

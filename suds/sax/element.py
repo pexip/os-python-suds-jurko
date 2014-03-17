@@ -19,11 +19,13 @@ Provides XML I{element} classes.
 """
 
 from logging import getLogger
+import sys
+
 from suds import *
 from suds.sax import *
 from suds.sax.text import Text
 from suds.sax.attribute import Attribute
-import sys
+
 if sys.version_info < (2, 4, 0):
     from sets import Set as set
     del sys
@@ -62,7 +64,7 @@ class Element(UnicodeMixin):
     specialprefixes = {Namespace.xmlns[0] : Namespace.xmlns[1]}
 
     @classmethod
-    def buildPath(self, parent, path):
+    def buildPath(cls, parent, path):
         """Build the specifed path as a/b/c.
 
         Any missing intermediate nodes are built automatically.
@@ -443,7 +445,7 @@ class Element(UnicodeMixin):
                 ns = node.resolvePrefix(prefix)
             result = node.getChild(name, ns)
             if result is None:
-                break;
+                break
             else:
                 node = result
         return result
@@ -733,9 +735,7 @@ class Element(UnicodeMixin):
         @rtype: basestring
         """
         tab = '%*s'%(indent*3,'')
-        result = []
-        result.append('%s<%s' % (tab, self.qname()))
-        result.append(self.nsdeclarations())
+        result = ['%s<%s' % (tab, self.qname()), self.nsdeclarations()]
         for a in [unicode(a) for a in self.attributes]:
             result.append(' %s' % a)
         if self.isempty():
@@ -758,9 +758,7 @@ class Element(UnicodeMixin):
         @return: A I{plain} string.
         @rtype: basestring
         """
-        result = []
-        result.append('<%s' % self.qname())
-        result.append(self.nsdeclarations())
+        result = ['<%s' % self.qname(), self.nsdeclarations()]
         for a in [unicode(a) for a in self.attributes]:
             result.append(' %s' % a)
         if self.isempty():
@@ -879,10 +877,9 @@ class Element(UnicodeMixin):
             else:
                 node = child
         if child is not None:
-            ns = None
             prefix, leaf = splitPrefix(leaf)
             if prefix is not None:
-                ns = node.resolvePrefix(prefix)
+                node.resolvePrefix(prefix)
             result = child.getChildren(leaf)
         return result
 

@@ -1,4 +1,5 @@
-﻿# This program is free software; you can redistribute it and/or modify
+﻿# -*- coding: UTF-8 -*-
+# This program is free software; you can redistribute it and/or modify
 # it under the terms of the (LGPL) GNU Lesser General Public License as
 # published by the Free Software Foundation; either version 3 of the
 # License, or (at your option) any later version.
@@ -18,21 +19,21 @@
 
 """Classes for conversion between XML dates and Python objects."""
 
-from suds import UnicodeMixin
-
 import datetime
 import re
 import time
 
+from suds import UnicodeMixin
 
-_SNIPPET_DATE =  \
+
+_SNIPPET_DATE = \
     r"(?P<year>\d{1,})-(?P<month>\d{1,2})-(?P<day>\d{1,2})"
-_SNIPPET_TIME =  \
-    r"(?P<hour>\d{1,2}):(?P<minute>[0-5]?[0-9]):(?P<second>[0-5]?[0-9])"  \
+_SNIPPET_TIME = \
+    r"(?P<hour>\d{1,2}):(?P<minute>[0-5]?[0-9]):(?P<second>[0-5]?[0-9])" \
     r"(?:\.(?P<subsecond>\d+))?"
-_SNIPPET_ZONE =  \
-    r"(?:(?P<tz_sign>[-+])(?P<tz_hour>\d{1,2})"  \
-    r"(?::(?P<tz_minute>[0-5]?[0-9]))?)"  \
+_SNIPPET_ZONE = \
+    r"(?:(?P<tz_sign>[-+])(?P<tz_hour>\d{1,2})" \
+    r"(?::(?P<tz_minute>[0-5]?[0-9]))?)" \
     r"|(?P<tz_utc>[Zz])"
 
 _PATTERN_DATE = r"^%s(?:%s)?$" % (_SNIPPET_DATE, _SNIPPET_ZONE)
@@ -139,7 +140,7 @@ class DateTime(UnicodeMixin):
         """
         match_result = _RE_DATETIME.match(value)
         if match_result is None:
-           raise ValueError("date data has invalid format '%s'" % (value,))
+            raise ValueError("date data has invalid format '%s'" % (value,))
 
         date = _date_from_match(match_result)
         time, round_up = _time_from_match(match_result)
@@ -197,7 +198,7 @@ class Time(UnicodeMixin):
         """
         match_result = _RE_TIME.match(value)
         if match_result is None:
-           raise ValueError("date data has invalid format '%s'" % (value,))
+            raise ValueError("date data has invalid format '%s'" % (value,))
 
         time, round_up = _time_from_match(match_result)
         tzinfo = _tzinfo_from_match(match_result)
@@ -227,7 +228,7 @@ class FixedOffsetTimezone(datetime.tzinfo, UnicodeMixin):
             offset = datetime.timedelta(hours=offset)
         elif type(offset) != datetime.timedelta:
             raise TypeError("timezone offset must be an int or "
-                "datetime.timedelta")
+                            "datetime.timedelta")
         if offset.microseconds or (offset.seconds % 60 != 0):
             raise ValueError("timezone offset must have minute precision")
         self.__offset = offset
@@ -265,7 +266,6 @@ class FixedOffsetTimezone(datetime.tzinfo, UnicodeMixin):
         total_seconds -= minutes * 60
 
         seconds = total_seconds // 1
-        total_seconds -= seconds
 
         if seconds:
             return "%+03d:%02d:%02d" % (hours, minutes, seconds)
@@ -348,7 +348,7 @@ class LocalTimezone(datetime.tzinfo):
     def __unicode__(self):
         dt = datetime.datetime.now()
         return "LocalTimezone %s offset: %s dst: %s" % (self.tzname(dt),
-            self.utcoffset(dt), self.dst(dt))
+                                                        self.utcoffset(dt), self.dst(dt))
 
 
 def _bump_up_time_by_microsecond(time):
@@ -363,7 +363,7 @@ def _bump_up_time_by_microsecond(time):
 
     """
     dt = datetime.datetime(2000, 1, 1, time.hour, time.minute,
-        time.second, time.microsecond)
+                           time.second, time.microsecond)
     dt += datetime.timedelta(microseconds=1)
     return dt.time()
 

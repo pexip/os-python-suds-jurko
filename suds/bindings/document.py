@@ -18,11 +18,12 @@
 Provides classes for the (WS) SOAP I{document/literal}.
 """
 
+from logging import getLogger
+
 from suds import *
 from suds.bindings.binding import Binding
 from suds.sax.element import Element
 
-from logging import getLogger
 
 log = getLogger(__name__)
 

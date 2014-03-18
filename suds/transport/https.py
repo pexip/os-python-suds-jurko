@@ -19,9 +19,11 @@ Contains classes for basic HTTP (authenticated) transport implementations.
 """
 
 import urllib2
+from logging import getLogger
+
 from suds.transport import *
 from suds.transport.http import HttpTransport
-from logging import getLogger
+
 
 log = getLogger(__name__)
 
@@ -71,7 +73,7 @@ class HttpAuthenticated(HttpTransport):
             self.pm.add_password(None, request.url, u, p)
 
     def credentials(self):
-        return (self.options.username, self.options.password)
+        return self.options.username, self.options.password
 
     def u2handlers(self):
             handlers = HttpTransport.u2handlers(self)

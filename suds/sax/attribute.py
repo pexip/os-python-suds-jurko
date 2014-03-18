@@ -18,11 +18,13 @@
 Provides XML I{attribute} classes.
 """
 
-import suds.sax
 from logging import getLogger
+
+import suds.sax
 from suds import *
 from suds.sax import *
 from suds.sax.text import Text
+
 
 log = getLogger(__name__)
 

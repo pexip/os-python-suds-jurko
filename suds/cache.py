@@ -18,16 +18,17 @@
 Contains basic caching classes.
 """
 
-import suds
-from suds.transport import *
-from suds.sax.parser import Parser
-from suds.sax.element import Element
-
 from datetime import datetime as dt
 from datetime import timedelta
 from logging import getLogger
 import os
 from tempfile import gettempdir as tmp
+
+import suds
+from suds.transport import *
+from suds.sax.parser import Parser
+from suds.sax.element import Element
+
 try:
     import cPickle as pickle
 except Exception:
@@ -201,7 +202,7 @@ class FileCache(Cache):
         if self.duration[1] < 1:
             return
         created = dt.fromtimestamp(os.path.getctime(fn))
-        d = {self.duration[0]:self.duration[1]}
+        d = {self.duration[0]: self.duration[1]}
         expired = created + timedelta(**d)
         if expired < dt.now():
             log.debug('%s expired, deleted', fn)

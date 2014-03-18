@@ -29,6 +29,7 @@ class AutoLinker(object):
     management between a L{Properties} object and the L{Properties}
     contained within I{values}.
     """
+
     def updated(self, properties, prev, next):
         """
         Notification that a values was updated and the linkage
@@ -45,6 +46,7 @@ class Link(object):
     @ivar endpoints: A tuple of the (2) endpoints of the link.
     @type endpoints: tuple(2)
     """
+
     def __init__(self, a, b):
         """
         @param a: Property (A) to link.
@@ -70,24 +72,24 @@ class Link(object):
         @rtype: L{Link}
         """
         if pA in pB.links or \
-           pB in pA.links:
-            raise Exception, 'Already linked'
+                        pB in pA.links:
+            raise Exception('Already linked')
         dA = pA.domains()
         dB = pB.domains()
         for d in dA:
             if d in dB:
-                raise Exception, 'Duplicate domain "%s" found' % d
+                raise Exception('Duplicate domain "%s" found' % d)
         for d in dB:
             if d in dA:
-                raise Exception, 'Duplicate domain "%s" found' % d
+                raise Exception('Duplicate domain "%s" found' % d)
         kA = pA.keys()
         kB = pB.keys()
         for k in kA:
             if k in kB:
-                raise Exception, 'Duplicate key %s found' % k
+                raise Exception('Duplicate key %s found' % k)
         for k in kB:
             if k in kA:
-                raise Exception, 'Duplicate key %s found' % k
+                raise Exception('Duplicate key %s found' % k)
         return self
 
     def teardown(self):
@@ -113,6 +115,7 @@ class Endpoint(object):
     @ivar target: The properties object.
     @type target: L{Property}
     """
+
     def __init__(self, link, target):
         self.link = link
         self.target = target
@@ -121,7 +124,7 @@ class Endpoint(object):
         return self.link.teardown()
 
     def __eq__(self, rhs):
-        return ( self.target == rhs )
+        return self.target == rhs
 
     def __hash__(self):
         return hash(self.target)
@@ -140,6 +143,7 @@ class Definition:
     @ivar default: The default value.
     @ivar type: any
     """
+
     def __init__(self, name, classes, default, linker=AutoLinker()):
         """
         @param name: The property name.
@@ -179,10 +183,9 @@ class Definition:
         if value is None:
             return
         if len(self.classes) and \
-            not isinstance(value, self.classes):
-                msg = '"%s" must be: %s' % (self.name, self.classes)
-                raise AttributeError,msg
-
+                not isinstance(value, self.classes):
+            msg = '"%s" must be: %s' % (self.name, self.classes)
+            raise AttributeError(msg)
 
     def __repr__(self):
         return '%s: %s' % (self.name, str(self))
@@ -212,6 +215,7 @@ class Properties:
     @ivar defined: A dict of property values.
     @type defined: dict
     """
+
     def __init__(self, domain, definitions, kwargs):
         """
         @param domain: The property domain name.
@@ -255,7 +259,7 @@ class Properties:
         """
         if isinstance(other, Properties):
             other = other.defined
-        for n,v in other.items():
+        for n, v in other.items():
             self.set(n, v)
         return self
 
@@ -436,8 +440,7 @@ class Properties:
         return value
 
     def str(self, history):
-        s = []
-        s.append('Definitions:')
+        s = ['Definitions:']
         for d in self.definitions.values():
             s.append('\t%s' % repr(d))
         s.append('Content:')
@@ -464,6 +467,7 @@ class Skin(object):
     @ivar __pts__: The wrapped object.
     @type __pts__: L{Properties}.
     """
+
     def __init__(self, domain, definitions, kwargs):
         self.__pts__ = Properties(domain, definitions, kwargs)
 
@@ -485,7 +489,7 @@ class Skin(object):
 
 
 class Unskin(object):
-    def __new__(self, *args, **kwargs):
+    def __new__(cls, *args, **kwargs):
         return args[0].__pts__
 
 
@@ -493,6 +497,7 @@ class Inspector:
     """
     Wrapper inspector.
     """
+
     def __init__(self, options):
         self.properties = options.__pts__
 

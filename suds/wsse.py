@@ -19,18 +19,19 @@ The I{wsse} module provides WS-Security.
 """
 
 from logging import getLogger
+from datetime import datetime, timedelta
+
 from suds import *
 from suds.sudsobject import Object
 from suds.sax.element import Element
 from suds.sax.date import DateTime, UtcTimezone
-from datetime import datetime, timedelta
+
 
 try:
     from hashlib import md5
 except ImportError:
     # Python 2.4 compatibility
     from md5 import md5
-
 
 dsns = \
     ('ds',
@@ -98,7 +99,7 @@ class Token(Object):
         return str(utc)
 
     def __init__(self):
-            Object.__init__(self)
+        Object.__init__(self)
 
 
 class UsernameToken(Token):
@@ -136,10 +137,7 @@ class UsernameToken(Token):
         @type text: str
         """
         if text is None:
-            s = []
-            s.append(self.username)
-            s.append(self.password)
-            s.append(Token.sysdate())
+            s = [self.username, self.password, Token.sysdate()]
             m = md5()
             m.update(':'.join(s))
             self.nonce = m.hexdigest()
@@ -157,7 +155,6 @@ class UsernameToken(Token):
             self.created = Token.utc()
         else:
             self.created = dt
-
 
     def xml(self):
         """

@@ -19,12 +19,15 @@ Provides classes for handling soap multirefs.
 """
 
 from logging import getLogger
+
 from suds import *
 from suds.sax.element import Element
+
 
 log = getLogger(__name__)
 
 soapenc = (None, 'http://schemas.xmlsoap.org/soap/encoding/')
+
 
 class MultiRef:
     """
@@ -122,4 +125,4 @@ class MultiRef:
         if root is None:
             return True
         else:
-            return ( root.value == '1' )
+            return root.value == '1'

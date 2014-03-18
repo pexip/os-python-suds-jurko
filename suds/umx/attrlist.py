@@ -85,4 +85,4 @@ class AttrList:
             'http://schemas.xmlsoap.org/soap/envelope/',
             'http://www.w3.org/2003/05/soap-envelope',
         )
-        return ( Namespace.xs(ns) or ns[1] in skip )
+        return Namespace.xs(ns) or ns[1] in skip

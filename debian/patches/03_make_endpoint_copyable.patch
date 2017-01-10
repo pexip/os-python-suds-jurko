@@ -1,0 +1,33 @@
+diff --git a/suds/properties.py b/suds/properties.py
+index 26939db..7755a2b 100644
+--- a/suds/properties.py
++++ b/suds/properties.py
+@@ -19,6 +19,7 @@ Properties classes.
+ """
+ 
+ from logging import getLogger
++import copy
+ 
+ log = getLogger(__name__)
+ 
+@@ -129,6 +130,20 @@ class Endpoint(object):
+     def __getattr__(self, name):
+         return getattr(self.target, name)
+ 
++    def __copy__(self):
++        cls = self.__class__
++        result = cls.__new__(cls)
++        result.__dict__.update(self.__dict__)
++        return result
++
++    def __deepcopy__(self, memo):
++        cls = self.__class__
++        result = cls.__new__(cls)
++        memo[id(self)] = result
++        for k, v in self.__dict__.items():
++            setattr(result, k, copy.deepcopy(v, memo))
++        return result
++
+ 
+ class Definition:
+     """
